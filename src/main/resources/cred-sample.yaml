@@ -1,0 +1,41 @@
+shoonya:
+  uid : ""
+  user  : ""
+  password  : ""
+  vc  : ""
+  apiKey : ""
+  imei  : "abc1234"
+  totpKey: ""
+  source  : "API"
+  emailId  : ""
+  cliname : ""
+  prfname : "SHOONYA"
+  acctnum : ""
+  bankn : ""
+  ifscCode : ""
+  nfoFile  : "https://api.shoonya.com/NFO_symbols.txt.zip"
+  nseFile  : "https://api.shoonya.com/NSE_symbols.txt.zip"
+  bfoFile  : "https://api.shoonya.com/BFO_symbols.txt.zip"
+  bseFile  : "https://api.shoonya.com/BSE_symbols.txt.zip"
+  logFolder: "/opt/var/shoonya/logs"
+
+intraday-updater:
+  # indexes: ['NIFTY', 'BANKNIFTY', 'FINNIFTY']
+  maxTrades : 5
+  indexes:
+    - name: 'NIFTY'
+      exchange: NSE
+      token: 26000
+      minLotSize: 25
+      futSl: 7
+      maxFutSl : 7
+      targets: [10, 20, 30]
+      triggerDiff: 0.2
+    - name: 'BANKNIFTY'
+      exchange: NSE
+      token: 26009
+      minLotSize: 15
+      futSl: 30
+      maxFutSl : 17
+      targets: [40, 70, 100]
+      triggerDiff: 0.5
