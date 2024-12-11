@@ -161,3 +161,7 @@ replay_pid*
 target/
 .idea/
 mvnw*
+#test/
+#TODO: how to deal with test folder and test classes, look into unit tests
+
+cred.yml
