@@ -1,44 +1,62 @@
-package com.example.trade_server.service;
+package com.shoonya.trade_server.service;
 
-import com.example.trade_server.lib.ShoonyaWebSocket;
+import com.shoonya.trade_server.config.ShoonyaConfig;
+import com.shoonya.trade_server.entity.TokenInfo;
+import com.shoonya.trade_server.lib.ShoonyaWebSocket;
 import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import com.neovisionaries.ws.client.WebSocketException;
 import com.noren.javaapi.NorenApiJava;
+import jakarta.annotation.PostConstruct;
+import lombok.Getter;
+import lombok.Setter;
 import org.json.JSONObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+@Getter
+@Setter
 @Service
 public class ShoonyaWebsocketService {
 
+    ShoonyaConfig shoonyaConfig;
+
+    OrderManagementService orderManagementService;
+
+    NorenApiJava api;
+    public ShoonyaWebsocketService(ShoonyaLoginService shoonyaLoginService,  ShoonyaConfig shoonyaConfig, OrderManagementService orderManagementService){
+        this.api = shoonyaLoginService.getApi();
+        this.shoonyaConfig = shoonyaConfig;
+        this.orderManagementService = orderManagementService;
+    }
+
     private static final Logger logger = LogManager.getLogger(ShoonyaWebsocketService.class);
-    public ShoonyaWebSocket client;
-    public boolean feed_opened = false;
-    private static final Map<String, Map<String, Object>> feedJson = new HashMap<>();
-    private static final Map<String, Double> ltps = new HashMap<>();
-
-    final static String  websocketEndpoint = "wss://api.shoonya.com/NorenWSTP/";
+    private ShoonyaWebSocket wsClient;
+    private boolean feedOpened = false;
+    private  final Map<String, Map<String, Object>> feedJson = new HashMap<>();
+    private  final Map<String, Double> ltps = new HashMap<>();
 
 
-    public void event_handler_order_update(JSONObject orderUpdate){
-        logger.debug("order feed {order_update}");
+
+
+    public void eventHandlerOrderUpdate(JSONObject orderUpdate){
+        logger.info("order feed {}", orderUpdate);
         try {
-//        update_orders(order_update); TODO: add function in another service
+        orderManagementService.updateOrder(wsClient, orderUpdate);
         } catch (java.lang.Exception e) {
-//            throw new RuntimeException(e);
-            logger.error("update order error occured {}", e);
+            logger.error("update order error occured {}", e.getMessage());
         }
     }
 
 
-    public static void eventHandlerFeedUpdate(JSONObject tickData) {
+    public void eventHandlerFeedUpdate(JSONObject tickData) {
         boolean UPDATE = false;
 
         if (tickData.has("tk")) {
@@ -74,10 +92,7 @@ public class ShoonyaWebsocketService {
                     try {
                         ltps.put(token, Double.parseDouble(feedJson.get(token).get("ltp").toString()));
 
-                        // Call manage_option_sl if trade is active for token
-//                        if (TRADE.containsKey(token)) {
-//                            manageOptionSl(token, feedData);
-//                          }
+                        orderManagementService.manageOptionSl(token, ltps.get(token));
                     } catch (Exception e) {
                         logger.error("Error with feed occurred: {}", e.getMessage());
                     }
@@ -86,17 +101,19 @@ public class ShoonyaWebsocketService {
         }
     }
 
-    public void open_callback(){
-        this.feed_opened = true;
+    public void openCallback(){
+        this.feedOpened = true;
         logger.info("websocket opened");
     }
 
-    public void startWebsocket(NorenApiJava api) throws Exception {
+    @PostConstruct
+    public void startWebsocket() throws Exception {
 
+        String websocketEndpoint = shoonyaConfig.getWebsocket();
         ShoonyaWebSocket.WebSocketHandler handler = new ShoonyaWebSocket.WebSocketHandler() {
             @Override
             public void onTextMessage(String message) {
-//                System.out.println("Message received: " + message);
+//                logger.info("Message received: {}" , message);
                 JSONObject res = new JSONObject(message);
 
                 //feed update
@@ -107,11 +124,11 @@ public class ShoonyaWebsocketService {
 
                 // feed order update
                 if (res.getString("t") .equals("om"))
-                    event_handler_order_update(res);
+                    eventHandlerOrderUpdate(res);
 
                 // feed started
                 if (res.getString("t") .equals("ck") && res.getString("s") .equals("OK"))
-                    open_callback();
+                    openCallback();
 
                 // feed error
                 if (res.getString("t") .equals("ck") && !res.getString("s") .equals("OK"))
@@ -121,22 +138,29 @@ public class ShoonyaWebsocketService {
 
             @Override
             public void onError(WebSocketException cause) {
-                System.err.println("Error occurred: " + cause.getMessage());
+                logger.error("Error occurred: {}" , cause.getMessage());
             }
         };
-        client = new ShoonyaWebSocket(websocketEndpoint, api, handler);
+        this.wsClient = new ShoonyaWebSocket(websocketEndpoint, this.api, handler);
 //        client = new ShoonyaWebSocketNeo(websocketEndpoint, api);
 
-        client.connect();
-        while (!this.feed_opened)
+        this.wsClient.connect();
+        //TODO: use asynchronous? what is the use
+        while (!this.feedOpened)
             TimeUnit.SECONDS.sleep(1);
 
     }
 
-    public void subscribe(String exch, String token){
-        String instrument = exch + "|" + token;
-        this.client.subscribe(instrument, NorenApiJava.FeedType.TOUCHLINE);
+    public void subscribe(TokenInfo tokenInfo){
+        String instrument = tokenInfo.getInstrument();
+        this.wsClient.subscribe(instrument, NorenApiJava.FeedType.TOUCHLINE);
         logger.info("subscribed to {}", instrument );
+    }
+
+    public void unsubscribe(TokenInfo tokenInfo){
+        String instrument = tokenInfo.getInstrument();
+        this.wsClient.unsubscribe(instrument, NorenApiJava.FeedType.TOUCHLINE);
+        logger.info("unsubscribed from {}", instrument );
     }
 }
 

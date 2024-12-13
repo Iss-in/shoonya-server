@@ -115,6 +115,11 @@
 			<artifactId>tyrus-client</artifactId>
 			<version>1.15</version>
 		</dependency>
+		<dependency>
+			<groupId>tech.tablesaw</groupId>
+			<artifactId>tablesaw-core</artifactId>
+			<version>0.43.1</version>
+		</dependency>
 
 	</dependencies>
 

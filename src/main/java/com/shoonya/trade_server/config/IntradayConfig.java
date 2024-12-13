@@ -1,4 +1,4 @@
-package com.example.trade_server.config;
+package com.shoonya.trade_server.config;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -10,8 +10,8 @@ import java.util.List;
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "intraday-updater")
-public class IntradayUpdaterConfig {
+@ConfigurationProperties(prefix = "intraday")
+public class IntradayConfig {
     private String outFolder;
     private int maxTrades;
     private List<Index> indexes;
@@ -22,12 +22,10 @@ public class IntradayUpdaterConfig {
         private String name;
         private int token;
         private int minLotSize;
-        private int futSl;
-        private int maxFutSl;
-        private List<Integer> targets;
-        private int triggerDiff;
-//      TODO: change name of diff
-
+        private double futSl;
+        private double maxFutSl;
+        private List<Double> targets;
+        private double triggerDiff;
     }
 
 }

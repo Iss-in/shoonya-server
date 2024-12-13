@@ -1,4 +1,4 @@
-package com.example.trade_server.lib;
+package com.shoonya.trade_server.lib;
 
 import com.neovisionaries.ws.client.*;
 import com.noren.javaapi.NorenApiJava;
@@ -20,10 +20,9 @@ public class ShoonyaWebSocket {
         this.websocketConnected = state;
     }
 
-    public static Logger logger = LogManager.getLogger(ShoonyaWebSocket.class.getName());
+    private Logger logger = LogManager.getLogger(ShoonyaWebSocket.class.getName());
 
-    public ShoonyaWebSocket(String websocketEndpoint, NorenApiJava api, WebSocketHandler handler ) throws WebSocketException {
-//    public ShoonyaWebSocketNeo(String websocketEndpoint, NorenApiJava api ) throws WebSocketException {
+    public ShoonyaWebSocket(String websocketEndpoint, NorenApiJava api, WebSocketHandler handler )  {
 
         try {
             WebSocketFactory factory = new WebSocketFactory();
@@ -61,7 +60,7 @@ public class ShoonyaWebSocket {
                 public void onDisconnected(WebSocket websocket, WebSocketFrame serverCloseFrame, WebSocketFrame clientCloseFrame, boolean closedByServer) throws IOException, WebSocketException {
                     // create your reconnection logic here
                     logger.error("Websocker disconnected, connecting again");
-                    websocket = websocket.recreate().connect();
+                    ws = websocket.recreate().connect();
                 }
 
 
@@ -78,13 +77,8 @@ public class ShoonyaWebSocket {
                     data.put("uid", actid);
                     data.put("susertoken", susertoken);
                     data.put("source", source);
-                    logger.info("sending cred data to websocket on connecting {}", data.toString());
+                    logger.info("sending cred data to websocket on connecting {}", data);
                     websocket.sendText(data.toString());
-//                    ws.sendText("{\"t\":\"c\",\"uid\":\"" + actid +
-//                            "\",\"actid\":\"" + actid +
-//                            "\",\"susertoken\":\"" + susertoken +
-//                            "\", \"source\":\"" + source + "\"}");
-
                 }
 
             });
@@ -92,13 +86,11 @@ public class ShoonyaWebSocket {
             logger.error("error in initializing websocket {}", e.getMessage());
             throw new RuntimeException(e);
         }
-//        ws.connect();
-//        this.ws.connectAsynchronously();
     }
 
     public void subscribe(String instrument, NorenApiJava.FeedType feedType){
         if(this.websocketConnected) {
-            System.out.println("subscribing to "+ instrument);
+            logger.info("subscribing to {}", instrument);
             String feedTypeCode = feedType == NorenApiJava.FeedType.TOUCHLINE ? "t" : "d";
             JSONObject data = new JSONObject();
             data.put("t", feedTypeCode);
@@ -106,31 +98,31 @@ public class ShoonyaWebSocket {
             ws.sendText(data.toString());
         }
         else
-            logger.info("could not subscribe because of websocket state "+ websocketConnected);
+            logger.info("could not subscribe because of websocket state {}", websocketConnected);
     }
     public void unsubscribe(String instrument, NorenApiJava.FeedType feedType){
         if(this.websocketConnected) {
-            System.out.println("subscribing to"+ instrument);
+            logger.info("unsubscribing from  {}", instrument);
             String feedTypeCode = feedType == NorenApiJava.FeedType.TOUCHLINE ? "u" : "ud";
             JSONObject data = new JSONObject();
             data.put("t", feedTypeCode);
             data.put("k", instrument);
             this.ws.sendText(data.toString());        }
         else
-            logger.info("could not subscribe because of websocket state "+ websocketConnected);
+            logger.info("could not subscribe because of websocket state {}", websocketConnected);
     }
 
     public void closeWebsocket(){
-        if(!this.websocketConnected == false ) {
+        if(this.websocketConnected ) {
             changeConnectionState(false);
             this.ws.setPingInterval(0);
         }
     }
 
     // Start the WebSocket connection
-    public void connect() throws Exception {
-        this.ws.connect();
-//        this.ws.connectAsynchronously(); TODO: check if asynchronous work
+    public void connect()  {
+//        this.ws.connect();
+        this.ws.connectAsynchronously();// TODO: check if asynchronous work
     }
 
 

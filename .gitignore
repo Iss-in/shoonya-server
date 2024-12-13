@@ -164,4 +164,4 @@ mvnw*
 #test/
 #TODO: how to deal with test folder and test classes, look into unit tests
 
-cred.yml
+/src/main/resources/cred.yaml

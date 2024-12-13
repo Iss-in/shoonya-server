@@ -1,12 +1,12 @@
-package com.example.trade_server.service;
+package com.shoonya.trade_server.service;
 
-import com.example.trade_server.config.ShoonyaConfig;
+import com.shoonya.trade_server.config.ShoonyaConfig;
 import com.noren.javaapi.NorenApiJava;
+import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import org.apache.commons.codec.DecoderException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.security.InvalidKeyException;
@@ -18,42 +18,53 @@ import org.apache.commons.codec.binary.Hex;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import static com.shoonya.trade_server.service.TOTPGenerator.generateTOTP;
+
 @Service
 public class ShoonyaLoginService {
 
-    @Autowired
     private ShoonyaConfig config;
 
+    public ShoonyaLoginService(ShoonyaConfig config){
+        this.config = config;
+    }
+
+    @Getter
     private NorenApiJava api;
-    public JSONObject shoonyaLoginState;
+    public static final Logger logger = LogManager.getLogger(ShoonyaLoginService.class.getName());
 
-//    ShoonyaLoginService (){
-//        feedOpened = Boolean.FALSE;
-//    }
-    public static Logger logger = LogManager.getLogger(ShoonyaLoginService.class.getName());
-//    TODO: add logging statements in this class
-    public NorenApiJava login(String host, String websocket){
-        api = new NorenApiJava(host, websocket);
-        String totp_key = config.getTotpKey();
+    @PostConstruct
+    public void login() {
+        logger.info("initiating api login");
+        this.api = loginToApi();
+    }
 
-        TOTPGenerator totpGenerator = new TOTPGenerator();
-        String twoFa =  totpGenerator.generateTOTP(totp_key, 6);
-        String response = api.login(config.getUser(), config.getPassword(), twoFa, config.getVc(), config.getApiKey(), config.getImei(),
+    private NorenApiJava loginToApi(){
+
+        String host = config.getHost();
+
+        NorenApiJava sessionApi = new com.noren.javaapi.NorenApiJava(host);
+        String totpKey = config.getTotpKey();
+
+        String twoFa =  generateTOTP(totpKey, 6);
+        logger.info("totp is {}", twoFa );
+        String response = sessionApi.login(config.getUser(), config.getPassword(), twoFa, config.getVc(), config.getApiKey(), config.getImei(),
                 config.getEmailId(), config.getCliname(), config.getPrfname(), config.getAcctnum(),
                 config.getBankn(), config.getIfscCode());
 
-        System.out.println("response is " + response );
-
-//        shoonyaLoginState.put(api.actid,
-        return api;
+        logger.info("login response is {}", response );
+        return sessionApi;
     }
-
 }
+
+
 
 class TOTPGenerator {
 
     private static final int TIME_STEP_SECONDS = 30; // Default time step for TOTP
     private static final String HMAC_ALGORITHM = "HmacSHA1"; // SHA-1 is the default for TOTP
+
+    private TOTPGenerator() {}
 
     public static String generateTOTP(String secretKey, int digits) {
         try {

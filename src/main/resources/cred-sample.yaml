@@ -19,8 +19,7 @@ shoonya:
   bseFile  : "https://api.shoonya.com/BSE_symbols.txt.zip"
   logFolder: "/opt/var/shoonya/logs"
 
-intraday-updater:
-  # indexes: ['NIFTY', 'BANKNIFTY', 'FINNIFTY']
+intraday:
   maxTrades : 5
   indexes:
     - name: 'NIFTY'

@@ -1,10 +1,11 @@
-package com.example.trade_server.config;
+package com.shoonya.trade_server.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,12 +23,17 @@ public class ShoonyaConfig {
     private String prfname;
     private String acctnum;
     private String bankn;
+    private String upi;
     private String ifscCode;
     private String logFolder;
+    private List<Exchange> exchanges;
+    private String host;
+    private String websocket;
 
-    private String nseFile;
-    private String nfoFile;
-
-    private String bseFile;
-    private String bfoFile;
+    @Getter
+    @Setter
+    public static class Exchange {
+        private String name;
+        private String fileUri;
+    }
 }
