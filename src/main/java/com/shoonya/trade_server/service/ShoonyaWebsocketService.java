@@ -52,6 +52,9 @@ public class ShoonyaWebsocketService {
         orderManagementService.updateOrder(wsClient, orderUpdate);
         } catch (java.lang.Exception e) {
             logger.error("update order error occured {}", e.getMessage());
+            // Log with the specific line number
+            StackTraceElement element = e.getStackTrace()[0];
+            logger.error("Error occurred at line: {}", element.getLineNumber());
         }
     }
 
@@ -133,6 +136,7 @@ public class ShoonyaWebsocketService {
                 // feed error
                 if (res.getString("t") .equals("ck") && !res.getString("s") .equals("OK"))
                     logger.error("Error with feed {}", res);
+                    // Log with the specific line number
             }
 
 

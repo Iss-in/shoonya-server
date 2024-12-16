@@ -2,6 +2,10 @@ package com.shoonya.trade_server.service;
 
 import com.shoonya.trade_server.config.IntradayConfig;
 import com.shoonya.trade_server.config.ShoonyaConfig;
+import com.shoonya.trade_server.entity.NfoSymbols;
+import com.shoonya.trade_server.entity.NseSymbols;
+import com.shoonya.trade_server.repositories.NfoSymbolsRepository;
+import com.shoonya.trade_server.repositories.NseSymbolsRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,10 +14,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.stereotype.Service;
+import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;
 
 import java.io.*;
 import java.net.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -23,18 +31,25 @@ import java.util.zip.ZipInputStream;
 @Service
 public class StartupService {
 
-//    @Autowired
+    //    @Autowired
     ShoonyaConfig shoonyaConfig;
 
-    private Map<String, Table > dataFrames;
+    private Map<String, Table> dataFrames;
     private List<ShoonyaConfig.Exchange> exchanges;
     private List<IntradayConfig.Index> indexes;
+    private NfoSymbolsRepository nfoSymbolsRepository;
+    private NseSymbolsRepository nseSymbolsRepository;
 
-    public StartupService(ShoonyaConfig shoonyaConfig, IntradayConfig intradayConfig){
-        exchanges = shoonyaConfig.getExchanges();
-        indexes = intradayConfig.getIndexes();
-        dataFrames = new HashMap();
+    public StartupService(ShoonyaConfig shoonyaConfig, IntradayConfig intradayConfig,
+                          NfoSymbolsRepository nfoSymbolsRepository, NseSymbolsRepository nseSymbolsRepository) {
+
+        this.exchanges = shoonyaConfig.getExchanges();
+        this.indexes = intradayConfig.getIndexes();
+        this.dataFrames = new HashMap();
+        this.nfoSymbolsRepository = nfoSymbolsRepository;
+        this.nseSymbolsRepository = nseSymbolsRepository;
     }
+
     private static final Logger logger = LoggerFactory.getLogger(StartupService.class.getName());
 
     // TODO: improve error handling, dont throw it in function, but catch it, since function cant catch more than one exception
@@ -141,7 +156,10 @@ public class StartupService {
                 zipInputStream.closeEntry();
                 logger.info("Extracted symbol file {}", entry.getName());
 
-                loadSymbols(destDir + '/' +  entry.getName(), exch);
+                //TODO: reenable them
+//                loadSymbols(destDir + '/' +  entry.getName(), exch);
+//                loadSymbolsToDb(destDir + '/' +  entry.getName(), exch);
+
             }
         } catch (IOException e) {
             logger.error("Error extracting ZIP file: {}" , e.getMessage());
@@ -151,8 +169,59 @@ public class StartupService {
     public void loadSymbols(String file, String exch)  {
         logger.info("loading symbol file {} from exchange {}", file, exch);
         Table table = Table.read().csv(file);
+        StringColumn symbolColumn = table.stringColumn("Symbol");
+        table = table.where(symbolColumn.containsString("NIFTY"));
         this.dataFrames.put(exch, table);
         logger.info("dataframe created");
     }
 
+    public void loadSymbolsToDb(String file, String exch) {
+        // #TODO: catch data to memory for faster speed -- use Redis ?
+        //#TODO: shift df logic to db, uplod entire file to db instead -- too slow without redis
+        //TODO: take backup of db regularly
+        logger.info("loading symbol file {} from exchange {}", file, exch);
+        Table table = Table.read().csv(file);
+
+        if(exch.equals("NFO")) {
+            StringColumn symbolColumn = table.stringColumn("Symbol");
+            table = table.where(symbolColumn.containsString("NIFTY"));
+            table.stream().forEach(row -> {
+                NfoSymbols nfoSymbol = new NfoSymbols();
+                nfoSymbol.setToken(row.getInt("Token"));
+                nfoSymbol.setLotSize(row.getInt("LotSize"));
+                nfoSymbol.setSymbol(row.getString("Symbol"));
+                nfoSymbol.setTradingSymbol(row.getString("TradingSymbol"));
+                nfoSymbol.setInstrument(row.getString("Instrument"));
+                nfoSymbol.setOptionType(row.getString("OptionType"));
+                nfoSymbol.setStrikePrice(row.getDouble("StrikePrice"));
+                nfoSymbol.setTickSize(row.getDouble("TickSize"));
+
+                StringBuilder expiry = new StringBuilder(row.getString("Expiry")); // TODO: convert column to date
+                Date dt = new Date();
+                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH);;
+                try {
+                    dt = simpleDateFormat.parse(expiry.toString());
+                    nfoSymbol.setExpiry(dt);
+                } catch (ParseException e) {
+                    throw new RuntimeException(e);
+                }
+                nfoSymbolsRepository.save(nfoSymbol);
+            });
+        }
+        if(exch.equals("NSE")) {
+            table.stream().forEach(row -> {
+                NseSymbols nseSymbol = new NseSymbols();
+                nseSymbol.setToken(row.getInt("Token"));
+                nseSymbol.setLotSize(row.getInt("LotSize"));
+                nseSymbol.setSymbol(row.getString("Symbol"));
+                nseSymbol.setTradingSymbol(row.getString("TradingSymbol"));
+                nseSymbol.setInstrument(row.getString("Instrument"));
+                nseSymbol.setTickSize(row.getDouble("TickSize"));
+                nseSymbolsRepository.save(nseSymbol);
+            });
+        }
+        logger.info("exchange {} uploaded to db", exch);
+
+
+    }
 }

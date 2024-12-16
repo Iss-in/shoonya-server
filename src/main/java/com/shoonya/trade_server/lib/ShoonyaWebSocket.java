@@ -31,7 +31,6 @@ public class ShoonyaWebSocket {
             // send custom ping every 3 second to maintain a forever connection
             this.ws.setPingInterval(3000);
             ws.sendPing("{\"t\":\"h\"}");
-//            TODO: uncomment ping part
 
             this.ws.addListener(new WebSocketAdapter() {
                 @Override
@@ -122,7 +121,7 @@ public class ShoonyaWebSocket {
     // Start the WebSocket connection
     public void connect()  {
 //        this.ws.connect();
-        this.ws.connectAsynchronously();// TODO: check if asynchronous work
+        this.ws.connectAsynchronously();// TODO: why is this better ?
     }
 
 

@@ -24,5 +24,3 @@ public class TokenInfo {
         return exch + '|' + token;
     }
 }
-
-//#TODO: shift df logic to db, uplod entire file to db instead

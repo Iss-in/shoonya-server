@@ -50,7 +50,7 @@ public class ShoonyaLoginService {
         logger.info("totp is {}", twoFa );
         String response = sessionApi.login(config.getUser(), config.getPassword(), twoFa, config.getVc(), config.getApiKey(), config.getImei(),
                 config.getEmailId(), config.getCliname(), config.getPrfname(), config.getAcctnum(),
-                config.getBankn(), config.getIfscCode());
+                config.getBankn(), config.getIfscCode(), config.getUpi());
 
         logger.info("login response is {}", response );
         return sessionApi;

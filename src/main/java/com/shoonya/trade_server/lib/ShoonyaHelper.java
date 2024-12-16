@@ -8,7 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-
+import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 //TODO: check type of beans and their function
@@ -32,25 +33,25 @@ public class ShoonyaHelper {
         return this.api.get_positions();
     }
 
-    public float getBrokerage(){
+    public double getBrokerage(){
         JSONObject ret = this.api.get_limits();
         if(ret == null)
             return 0;
 
-        float brokerage = 0;
+        double brokerage = 0;
         if(ret.has("brokerage"))
             brokerage = ret.getFloat("brokerage");
         return brokerage;
     }
 
-    public float getPnl(){
+    public double getPnl(){
         JSONArray positions = this.api.get_positions();
 
         if(positions == null)
             return 0;
 
-        float pnl = 0;
-        float mtm = 0;
+        double pnl = 0;
+        double mtm = 0;
 
         for (int i = 0; i < positions.length(); i++) {
             JSONObject position = positions.getJSONObject(i);
@@ -61,6 +62,27 @@ public class ShoonyaHelper {
         return pnl + mtm - getBrokerage();
 
     }
+
+    public int getTradeCount() {
+        int count = 0;
+
+        JSONArray ret = getTradebook();
+        if(ret == null)
+            return count;
+
+        List<String>order_uid = new ArrayList<>();
+        for(int i=0;i< ret.length();i++) {
+            JSONObject order = ret.getJSONObject(i);
+            String order_id = order.getString("norenordno");
+            if (!order_uid.contains(order_uid)) {
+                order_uid.add(order_id);
+                if(order.getString("trantype") .equals("B"))
+                    count = count + 1;
+            }
+        }
+        return count;
+    }
+
 
 
     private static final int MAX_TRIES = 5;
@@ -107,7 +129,7 @@ public class ShoonyaHelper {
                     break;
                 }
 
-//                Thread.sleep(500); TODO: make it sleep or not , also is it a thread or not
+                Thread.sleep(2000); // sleeping for 2 seconds
             }
         } catch (Exception e) {
             logger.error("Error in modifying order: {}", e.getMessage(), e);
@@ -140,7 +162,7 @@ public class ShoonyaHelper {
                         logger.debug("Running command api.place_order(buy_or_sell={}, product_type={}, exchange={}, " +
                                 "tradingsymbol={}, quantity={}, discloseqty=0, price_type='SL-LMT', price={}, " +
                                 "trigger_price={}, retention='DAY', remarks='stop_loss_order')", orderType, productType, exchange, tradingsymbol, quantity, price, triggerPrice);
-//TODO: fix  var17.put("prctyp", "price_type"); and put var7 in it
+
                         res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "SL-LMT", price, "stop loss order", triggerPrice, "DAY", null, null, null, null);
 
                         logger.info("Response: {}", res);
@@ -161,11 +183,12 @@ public class ShoonyaHelper {
 
                 // Increment try counter and sleep between attempts
                 currentTries++;
+                logger.warn("trying to place order again");
                 if (currentTries >= MAX_TRIES) {
                     logger.error("Max attempts to place order failed");
                     break;
                 }
-                Thread.sleep(500);  // Sleep for 0.5 seconds
+                Thread.sleep(2000);  // Sleep for 2 seconds
             }
         } catch (Exception e) {
             logger.error("Error in placing order: {}", e.getMessage(), e);
@@ -236,9 +259,8 @@ public class ShoonyaHelper {
                 if ("S".equals(order.getString("trantype"))) {
                     logger.debug("Converting all sell orders to market orders");
                     logger.debug("Running command ShoonyaHelper.modifyOrder(api, logger, {}, 'MKT')", order);
-                    //TODO: gotta check live
-                    ret = modifyOrder(order.getString("norenordno"), order.getString("exch"), order.getString("tsym")
-                            , order.getInt("qty"), "MKT", null, null);
+                    ret = modifyOrder(order.getString("exch"), order.getString("tsym"),
+                            order.getString("norenordno") , order.getInt("qty"), "MKT", 0.0, null);
                     logger.debug("Modify Order Response: {}", ret);
                 }
 
@@ -287,19 +309,27 @@ public class ShoonyaHelper {
 
 
 
-    public void withdraw(){
+    public JSONObject withdraw(){
+        JSONObject res = new JSONObject();
         try{
-            float maxpay = this.api.get_max_payout_amount().getFloat("payout");
+            float maxpay = this.api.get_max_payout_amount().getFloat("payout") -1;
             if(maxpay > 10) {
                 logger.info("withdrawing money {}", maxpay);
-                JSONObject res = this.api.funds_payout(maxpay, maxpay * -100);
-                // TODO: update noren class to change maxpay from float to string
+                res = this.api.funds_payout("" + maxpay, "" + maxpay * -100);
                 logger.info("funds withdrawn {}", res);
             }
             }
         catch(Exception  e){
             logger.error("error in withadrawing positions {}", e.getMessage());
         }
+        return res;
+    }
+
+
+    public int requestFunds(Double funds){
+        String withdraw =  "" + funds;
+        int returnCode = api.collect_trans_req(withdraw);
+        return returnCode;
     }
 
 }

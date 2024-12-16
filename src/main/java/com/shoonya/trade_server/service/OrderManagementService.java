@@ -65,11 +65,13 @@ public class OrderManagementService {
     Misc misc;
 
     ShoonyaHelper shoonyaHelper;
+    RiskManagementService riskManagementService;
 
-    public OrderManagementService(ShoonyaHelper shoonyaHelper, Misc misc){
+    public OrderManagementService(ShoonyaHelper shoonyaHelper, Misc misc, RiskManagementService riskManagementService){
         this.shoonyaHelper = shoonyaHelper;
         this.tradeManager = new TradeManager();
         this.misc = misc;
+        this.riskManagementService = riskManagementService;
     }
 
     public void createTrade(String token, JSONObject orderUpdate){
@@ -187,7 +189,7 @@ public class OrderManagementService {
         }
     }
 
-    public void updateOrder( ShoonyaWebSocket wsClient, @NotNull JSONObject orderUpdate){
+    public void updateOrder( ShoonyaWebSocket wsClient, @NotNull JSONObject orderUpdate) throws InterruptedException {
 
         String exch = orderUpdate.getString("exch");
         String tsym = orderUpdate.getString("tsym");
@@ -200,9 +202,12 @@ public class OrderManagementService {
 
         handleBuyOrder(wsClient, token, exch, orderUpdate);
         handleSellOrder(wsClient, token, exch, orderUpdate);
+
+        if (orderUpdate.getString("status").equals("COMPLETE")){
+            riskManagementService.checkRiskManagement();
+            }
     }
 
-    // TODO: figure out threading in this place
     public void placeSl(String pt, String token, PartialTrade trade){
         if(trade.getStatus() > 0)
             return ;
@@ -244,10 +249,37 @@ public class OrderManagementService {
         }
         if(ltp < trade.getMaxSlPrice()){
             logger.info("limit sl order crossed, exiting all trades with market orders");
-            this.shoonyaHelper.exitAllMarketOrders();
-//            #TODO: make market order exit function
+            exitAllCurrentTrades(token);
         }
         tradeManager.updateTrade(token, pt, trade);
+    }
+
+    public void exitAllCurrentTrades(String token){
+
+        ExecutorService executor = null;
+        Map<String, PartialTrade> trades = tradeManager.getTrade(token);
+
+        try{
+            executor = Executors.newFixedThreadPool( trades.size() );
+            for(Map.Entry<String, PartialTrade> entry : trades.entrySet()){
+                String pt = entry.getKey();
+                PartialTrade partialTrade = entry.getValue();
+
+                executor.submit(() ->shoonyaHelper.modifyOrder(partialTrade.getExch(),
+                        partialTrade.getTsym(),partialTrade.getOrderNumber(),partialTrade.getQty(),
+                        "MKT", 0.0, 0.0));
+            }
+        }
+        finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow(); // Force shutdown if not terminated
+                }            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
 
@@ -256,11 +288,10 @@ public class OrderManagementService {
             logger.debug("trade status false or current token is not of current trade");
             return;
         }
-        // TODO: make number of threads dyanamic per number of trades ? or keep a high number
+
         Map<String, PartialTrade> trades = tradeManager.getTrade(token);
         ExecutorService executor = null;
 
-        // TODO: figure out how to stop thread from placing extra orders ? or it is really placing extra orders because of retry code?
         try {
             executor = Executors.newFixedThreadPool( trades.size() );
 
@@ -282,13 +313,7 @@ public class OrderManagementService {
         }
 
 
-        // TODO: figure out how to stop thread from placing extra orders ? or it is really placing extra orders because of retry code?
-//        for(String pt:trades.keySet()){
-//            PartialTrade partialTrade = trades.get(pt);
-//            executor.submit(() -> {
-//                manageTrade(ltp, pt, partialTrade);
-//            });
-//        }
+
         // TODO: add in notes, entrySet is better than keySet in iterating over a map, efficient, as dont have to fetch value everytime
 
         trades = tradeManager.getTrade(token);
