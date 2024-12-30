@@ -22,7 +22,6 @@ DROP TABLE IF EXISTS nfo_symbols;
 DROP TABLE IF EXISTS nse_symbols;
 
 --
-----// todo: remove drop statement
 ----DROP TABLE IF EXISTS  trade;
 --CREATE TABLE IF NOT EXISTS trade (
 --  "timestamp" timestamp PRIMARY KEY,

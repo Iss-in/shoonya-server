@@ -7,7 +7,6 @@ import com.shoonya.trade_server.lib.Misc;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import com.shoonya.trade_server.repositories.TradeRepository;
 import com.shoonya.trade_server.service.RiskManagementService;
-import com.shoonya.trade_server.service.ShoonyaWebsocketService;
 import com.shoonya.trade_server.service.TradeParserService;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -30,7 +29,6 @@ import java.util.*;
 @RequestMapping("/api")
 public class TestController {
 
-    ShoonyaWebsocketService shoonyaWebsocketService;
     ShoonyaHelper shoonyaHelper;
     RiskManagementService riskManagementService;
     TradeRepository tradeRepository ;
@@ -39,33 +37,11 @@ public class TestController {
     @Autowired
     Misc misc;
 
-    public TestController(ShoonyaWebsocketService shoonyaWebsocketService, ShoonyaHelper shoonyaHelper, RiskManagementService riskManagementService, TradeRepository tradeRepository, TradeParserService tradeParserService) {
-        this.shoonyaWebsocketService = shoonyaWebsocketService;
+    public TestController(  ShoonyaHelper shoonyaHelper, RiskManagementService riskManagementService, TradeRepository tradeRepository, TradeParserService tradeParserService) {
         this.shoonyaHelper = shoonyaHelper;
         this.riskManagementService = riskManagementService;
         this.tradeRepository = tradeRepository;
         this.tradeParserService = tradeParserService;
-    }
-
-    @PostMapping("/subscribe")
-    public ResponseEntity<String> subscribeToken(@RequestBody TokenInfo tokenInfo) {
-        shoonyaWebsocketService.subscribe(tokenInfo);
-        return ResponseEntity.ok("Received token with instrument: " + tokenInfo.getInstrument());
-    }
-
-    @PostMapping("/testMisc")
-    public ResponseEntity<String> testMisc(@RequestBody TokenInfo tokenInfo) {
-        String exch = tokenInfo.getExch();
-        String token = tokenInfo.getToken();
-
-        Double sl = misc.getMaxSl(exch, token) / 2;
-        Double diff = misc.getTriggerdiff(exch, token);
-        int minLotSize = misc.getMinLotSize(exch, token);
-        List<Double> targets = misc.getTargets(exch, token);
-        System.out.println(sl + "," + diff + "," + minLotSize + "," + targets.toString());
-
-        shoonyaWebsocketService.subscribe(tokenInfo);
-        return ResponseEntity.ok("Received token with instrument: " + tokenInfo.getInstrument());
     }
 
     //    }
@@ -89,6 +65,8 @@ public class TestController {
 
     @PostMapping("/test")
     public void test() {
+//        tradeParserService.updateParsedTrades();
         tradeParserService.updateDailyRecords();
+
     }
 }

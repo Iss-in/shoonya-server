@@ -50,8 +50,8 @@ public class RiskManagementService {
         return maxLoss;
     }
 
-    @Scheduled(fixedRate = 600000)
-    void Update(){
+    @Scheduled(fixedRate = 60000)
+    void update(){
 //        System.out.println("Scheduled task is running at: " + System.currentTimeMillis());
         logger.info("updating trade details");
         this.pnl = shoonyaHelper.getPnl();
@@ -73,12 +73,12 @@ public class RiskManagementService {
             return true;
         }
 
-        if(this.tradeCount > this.maxTradeCount){
+        if(this.tradeCount >= this.maxTradeCount){
             logger.info("max trades crossed");
             return true;
         }
 
-        if(this.pnl < this.maxLoss * -3/2 ){
+        if(this.pnl <= this.maxLoss * -3/2 ){
             logger.info("next trade loss would exceed max_loss limit, stopping today's session");
             return true;
         }
@@ -87,12 +87,12 @@ public class RiskManagementService {
 
 
     public void checkRiskManagement() throws InterruptedException {
+        update();
         if(killswitch()) {
-            // once killswitch is crossed, keep running it for every minute itself
             while (true) {
                 shoonyaHelper.exitAllMarketOrders();
                 shoonyaHelper.withdraw();
-                TimeUnit.SECONDS.sleep(10);
+                TimeUnit.SECONDS.sleep(30);
             }
         }
     }
@@ -100,7 +100,7 @@ public class RiskManagementService {
     @PostConstruct
     public void check(){
         logger.warn("checking Killswitch on startup" );
-        Update();
+        update();
         if(killswitch()){
             logger.warn("Killswitch condition crossed");
             shoonyaHelper.exitAllMarketOrders();

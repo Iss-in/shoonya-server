@@ -5,13 +5,14 @@ import com.shoonya.trade_server.service.StartupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import tech.tablesaw.api.IntColumn;
-import tech.tablesaw.api.StringColumn;
-import tech.tablesaw.api.Table;
-import tech.tablesaw.api.TextColumn;
+import tech.tablesaw.api.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class Misc {
@@ -47,6 +48,34 @@ public class Misc {
         }
 
         return null; // Return null if no match is found
+    }
+
+
+    public LocalDate getNseWeeklyExpiry(String symbol, int week) {
+        Table df = dataFrames.get("NFO");
+        Table filteredTable = df.where(df.stringColumn("Symbol").isEqualTo(symbol));
+
+        // Parse the "Expiry" column into LocalDate
+        StringColumn expiryColumn = filteredTable.stringColumn("Expiry");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d-MMM-yyyy");
+        List<LocalDate> parsedDates = new ArrayList<>();
+
+        for (String dateStr : expiryColumn) {
+            parsedDates.add(LocalDate.parse(dateStr.substring(0, 1).toUpperCase() + dateStr.substring(1).toLowerCase(), formatter));
+        }
+
+        // Add the parsed dates back to the table as a new DateColumn
+        DateColumn parsedExpiryColumn = DateColumn.create("ParsedExpiry", parsedDates);
+        filteredTable.addColumns(parsedExpiryColumn);
+
+        // Sort the table by "ParsedExpiry" column
+        Table sortedTable = filteredTable.sortOn("ParsedExpiry");
+
+        // Get the unique expiry dates
+        List<LocalDate> uniqueDates = sortedTable.dateColumn("ParsedExpiry").asList();
+
+        // Return the expiry date for the specified week index
+        return uniqueDates.get(week);
     }
 
     public String getSpotSymbol(String exch, String token) {
@@ -124,5 +153,6 @@ public class Misc {
         }
         return targets;
     }
+
 }
 

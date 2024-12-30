@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  springboot-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shoonya-server
+    ports:
+      - "8090:8090"
+      - "5005:5005"  # Debug port
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - TZ=Asia/Kolkata
+    volumes:
+      - /home/kushy/Projects/shoonya_app/shoonya-server/logs:/logs
+      - ~/.m2:/root/.m2
+#      - /etc/timezone:/etc/timezone:ro
+#      - /etc/localtime:/etc/localtime:ro
+
+    restart: unless-stopped
+    networks:
+      - docker_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  docker_network:
+    external: true
+    name: docker_network
+
+volumes:
+  logs:
+    driver: local

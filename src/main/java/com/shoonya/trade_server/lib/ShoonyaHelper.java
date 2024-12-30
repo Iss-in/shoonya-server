@@ -71,15 +71,18 @@ public class ShoonyaHelper {
             return count;
 
         List<String>order_uid = new ArrayList<>();
-        for(int i=0;i< ret.length();i++) {
+        List<JSONObject> finalOrders = new ArrayList<>();
+        for (int i = ret.length() -1; i >=0; i--) {
             JSONObject order = ret.getJSONObject(i);
             String order_id = order.getString("norenordno");
-            if (!order_uid.contains(order_uid)) {
+            if (!order_uid.contains(order_id)) {
                 order_uid.add(order_id);
+                finalOrders.add(order);
                 if(order.getString("trantype") .equals("B"))
                     count = count + 1;
             }
         }
+        System.out.println("test");
         return count;
     }
 
@@ -196,6 +199,9 @@ public class ShoonyaHelper {
         }
 
         return res;
+    }
+    public void cancelOrderNo(String norenordno){
+        api.cancel_order(norenordno);
     }
 
     public  JSONObject cancelOrder(JSONObject order) {
@@ -325,7 +331,22 @@ public class ShoonyaHelper {
         return res;
     }
 
+    public JSONArray getOpenOrders(){
+        JSONArray ret =  new JSONArray();
+        JSONArray orderBook = getOrderBook();
 
+        for (int i = 0; i < orderBook.length(); i++) {
+            JSONObject order = orderBook.getJSONObject(i);
+            if ("TRIGGER_PENDING".equals(order.getString("status")) || "OPEN".equals(order.getString("status"))) {
+                ret.put(order);
+            }
+        }
+        return ret;
+    }
+
+    public JSONArray getTimePriceSeries(String exch, String token, String startTs, String endTs, String interval){
+        return api.get_time_price_series(exch, token, startTs, endTs, interval);
+    }
     public int requestFunds(Double funds){
         String withdraw =  "" + funds;
         int returnCode = api.collect_trans_req(withdraw);

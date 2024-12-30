@@ -20,7 +20,8 @@ public class IntradayConfig {
     @Setter
     public static class Index {
         private String name;
-        private int token;
+        private String exchange;
+        private String token;
         private int minLotSize;
         private double futSl;
         private double maxFutSl;

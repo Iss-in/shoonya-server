@@ -1,5 +1,6 @@
 package com.shoonya.trade_server.entity;
 
+import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.Setter;
 

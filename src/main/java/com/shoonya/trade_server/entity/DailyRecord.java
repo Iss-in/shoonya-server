@@ -41,7 +41,7 @@ public class DailyRecord {
 
     }
 
-    public DailyRecord(LocalDate date, Integer trades, Integer successfulTrades, Integer accountValue, Integer peakValue, Integer drawdown, Integer pnl, Integer maxLoss) {
+    public DailyRecord(LocalDate date, Integer trades, Integer successfulTrades, Integer accountValue, Integer peakValue, Integer drawdown, Integer pnl) {
         this.date = date;
         this.trades = trades;
         this.successfulTrades = successfulTrades;
@@ -49,6 +49,5 @@ public class DailyRecord {
         this.peakValue = peakValue;
         this.drawdown = drawdown;
         this.pnl = pnl;
-        this.maxLoss = maxLoss;
     }
 }

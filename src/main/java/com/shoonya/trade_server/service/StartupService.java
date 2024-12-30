@@ -1,9 +1,12 @@
 package com.shoonya.trade_server.service;
 
+import com.noren.javaapi.NorenApiJava;
 import com.shoonya.trade_server.config.IntradayConfig;
 import com.shoonya.trade_server.config.ShoonyaConfig;
 import com.shoonya.trade_server.entity.NfoSymbols;
 import com.shoonya.trade_server.entity.NseSymbols;
+import com.shoonya.trade_server.entity.TokenInfo;
+import com.shoonya.trade_server.lib.ShoonyaWebSocket;
 import com.shoonya.trade_server.repositories.NfoSymbolsRepository;
 import com.shoonya.trade_server.repositories.NseSymbolsRepository;
 import jakarta.annotation.PostConstruct;
@@ -21,6 +24,9 @@ import java.io.*;
 import java.net.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.Locale;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -36,15 +42,14 @@ public class StartupService {
 
     private Map<String, Table> dataFrames;
     private List<ShoonyaConfig.Exchange> exchanges;
-    private List<IntradayConfig.Index> indexes;
+
     private NfoSymbolsRepository nfoSymbolsRepository;
     private NseSymbolsRepository nseSymbolsRepository;
 
-    public StartupService(ShoonyaConfig shoonyaConfig, IntradayConfig intradayConfig,
+    public StartupService(ShoonyaConfig shoonyaConfig,
                           NfoSymbolsRepository nfoSymbolsRepository, NseSymbolsRepository nseSymbolsRepository) {
 
         this.exchanges = shoonyaConfig.getExchanges();
-        this.indexes = intradayConfig.getIndexes();
         this.dataFrames = new HashMap();
         this.nfoSymbolsRepository = nfoSymbolsRepository;
         this.nseSymbolsRepository = nseSymbolsRepository;
@@ -54,7 +59,7 @@ public class StartupService {
 
     // TODO: improve error handling, dont throw it in function, but catch it, since function cant catch more than one exception
     // TODO: learn exactly how error handling works
-    
+
     @PostConstruct
     public void init() throws IOException, URISyntaxException {
         logger.info("Running code at startup using @PostConstruct!");
@@ -63,6 +68,7 @@ public class StartupService {
         String saveDir = "/tmp/shoonya";
         downloadTokenFiles(saveDir);
     }
+
 
     public void downloadTokenFiles(String saveDir) throws IOException, URISyntaxException {
         for(ShoonyaConfig.Exchange exch:exchanges){
@@ -87,7 +93,7 @@ public class StartupService {
 
 
                 URLConnection connection = url.openConnection();
-            // Get the input stream of the connection (the file content)
+                // Get the input stream of the connection (the file content)
 
                 // Get the input stream of the connection (the file content)
                 InputStream inputStream = connection.getInputStream();
@@ -157,7 +163,7 @@ public class StartupService {
                 logger.info("Extracted symbol file {}", entry.getName());
 
                 //TODO: reenable them
-//                loadSymbols(destDir + '/' +  entry.getName(), exch);
+                loadSymbols(destDir + '/' +  entry.getName(), exch);
 //                loadSymbolsToDb(destDir + '/' +  entry.getName(), exch);
 
             }
@@ -195,16 +201,8 @@ public class StartupService {
                 nfoSymbol.setOptionType(row.getString("OptionType"));
                 nfoSymbol.setStrikePrice(row.getDouble("StrikePrice"));
                 nfoSymbol.setTickSize(row.getDouble("TickSize"));
-
-                StringBuilder expiry = new StringBuilder(row.getString("Expiry")); // TODO: convert column to date
-                Date dt = new Date();
-                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH);;
-                try {
-                    dt = simpleDateFormat.parse(expiry.toString());
-                    nfoSymbol.setExpiry(dt);
-                } catch (ParseException e) {
-                    throw new RuntimeException(e);
-                }
+                DateTimeFormatter ft = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+                nfoSymbol.setExpiry(LocalDate.parse(row.getString("Expiry"), ft));
                 nfoSymbolsRepository.save(nfoSymbol);
             });
         }

@@ -7,8 +7,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
-import java.util.Date;
+import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -30,7 +29,7 @@ public class NfoSymbols {
     private String tradingSymbol;
 
     @Column(name="expiry")
-    private Date expiry;
+    private LocalDate expiry;
 
     @Column(name="instrument")
     private String instrument;
