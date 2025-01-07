@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.id.IncrementGenerator;
+import org.json.JSONArray;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,7 +41,8 @@ public class Trade {
 
     public Trade (){}
 
-    public Trade(String exch, String orderId, LocalDateTime timestamp, String tradingSymbol, int qty, String orderType, double price) {
+    public Trade(String exch, String orderId, LocalDateTime timestamp, String tradingSymbol,
+                 int qty, String orderType, double price) {
         this.exch = exch;
         this.orderId = orderId;
         this.timestamp = timestamp;

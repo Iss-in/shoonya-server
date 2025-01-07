@@ -2,6 +2,7 @@ package com.shoonya.trade_server.service;
 
 import com.shoonya.trade_server.config.IntradayConfig;
 import com.shoonya.trade_server.entity.DailyRecord;
+import com.shoonya.trade_server.exceptions.RecordNotFoundException;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import com.shoonya.trade_server.repositories.DailyRecordRepository;
 import jakarta.annotation.PostConstruct;
@@ -44,8 +45,13 @@ public class RiskManagementService {
 
     public int getMaxloss(){
         LocalDate date = LocalDate.now();
-        DailyRecord record = this.dailyRecordRepository.findRecordByDate(date);
-        int maxLoss = record.getMaxLoss();
+        int maxLoss = 0;
+        try {
+            DailyRecord record = this.dailyRecordRepository.findById(date).orElseThrow(() -> new RecordNotFoundException("Record not found"));
+            maxLoss = record.getMaxLoss();
+        }  catch(Exception e) {
+            logger.info("record not found for {}", date);
+        }
         logger.info("max loss for today is {}", maxLoss);
         return maxLoss;
     }

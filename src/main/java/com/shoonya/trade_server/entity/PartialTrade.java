@@ -36,7 +36,11 @@ public class PartialTrade {
 
     private Double diff;
 
-    public PartialTrade(String name, int status, int qty, Double entryPrice, Double slPrice,  Double maxSlPrice, Double targetPrice, String orderType, String prd, String exch, String tsym,  Double diff) {
+    private String token;
+
+    public PartialTrade(String name, int status, int qty, Double entryPrice, Double slPrice,
+                        Double maxSlPrice, Double targetPrice, String orderType, String prd,
+                        String exch, String tsym,  Double diff, String token) {
         this.name = name;
         this.status = status;
         this.qty = qty;
@@ -49,6 +53,7 @@ public class PartialTrade {
         this.exch = exch;
         this.tsym = tsym;
         this.diff = diff;
+        this.token = token;
 
     }
 }

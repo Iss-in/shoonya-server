@@ -13,6 +13,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -36,18 +37,18 @@ public class PollingController {
         this.dailyRecordRepository = dailyRecordRepository;
     }
 
-    @GetMapping("/atmSymbols")
-    public Map<String, Object> getAtmSymbols() {
-        Map<String, Object> map = optionUpdateService.getAtmSymbols().toMap();
-        return map;
-    }
+//    @GetMapping("/atmSymbols")
+//    public Map<String, Object> getAtmSymbols() {
+//        Map<String, Object> map = optionUpdateService.getAtmSymbols().toMap();
+//        return map;
+//    }
 
     @GetMapping("/atmPrice/{symbol}")
     public Map<String, Object> getAtmPrice(@PathVariable String symbol) {
-        JSONObject prices = optionUpdateService.getAtmPrice(symbol);
-//        JSONObject prices = new JSONObject();
-//        prices.put("NIFTY26DEC24C0", 123);
-//        prices.put("NIFTY26DEC24P0", 223);
+//        JSONObject prices = n
+        JSONObject prices = new JSONObject();
+        prices.put("NIFTY26DEC24C0", 123);
+        prices.put("NIFTY26DEC24P0", 223);
         Map<String, Object> map = prices.toMap();
         return map;
     }
@@ -72,6 +73,7 @@ public class PollingController {
 
     @GetMapping("/positions")
     public Map<String, Object> positions() {
+//        JSONArray positions = shoonyaHelper.getPositions();
         JSONArray x = new JSONArray();
         JSONObject res = new JSONObject();
         res.put("symbol", "NIFTY23JUN18000CE");
@@ -96,6 +98,11 @@ public class PollingController {
             res.put(record.getDate(), record.getPnl());
 //        Map<String, Object> map = res.toMap();
         return res;
+    }
+
+    @PostMapping("/firstFetch")
+    public void test() throws IOException, InterruptedException {
+        optionUpdateService.setLastestOptions(true);
     }
 
 

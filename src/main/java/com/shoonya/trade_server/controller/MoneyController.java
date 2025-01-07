@@ -33,28 +33,6 @@ public class MoneyController {
     }
 
 
-
-    String post(String var1, String var2, JSONObject var3) {
-        OkHttpClient client = new OkHttpClient();
-        final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-
-        String var10000 = var3.toString();
-        String var4 = "jData=" + var10000 + "&jKey=" + var2;
-        System.out.println(var1 + " " + var4);
-        RequestBody var5 = RequestBody.create(var4, JSON);
-        Request var6 = (new Request.Builder()).url(var1).post(var5).build();
-
-        try {
-            Response var7 = client.newCall(var6).execute();
-            return var7.body().string();
-        } catch (IOException var8) {
-            var8.printStackTrace();
-            return var8.toString();
-        }
-    }
-
-
-
     @PostMapping("/addFunds/{money}")
     ResponseEntity<String>  addFunds(@PathVariable Double money) {
 

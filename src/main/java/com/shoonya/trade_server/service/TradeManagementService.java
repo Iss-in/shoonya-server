@@ -72,7 +72,7 @@ public class TradeManagementService {
     private  final Map<String, Double> ltps = new HashMap<>();
     private List <String> subscribedTokens = new ArrayList<>();
 
-    private List<Map<String, Object>> openOrders = new ArrayList<>();
+    private JSONArray openOrders;
 
     private LocalDateTime lastbuyTime = LocalDateTime.now().minusDays(1);
     TradeManager tradeManager;
@@ -83,14 +83,16 @@ public class TradeManagementService {
     RiskManagementService riskManagementService;
     ShoonyaConfig shoonyaConfig;
     NorenApiJava api;
+    private JSONObject candleStics;
 
     private IntradayConfig intradayConfig;
     private List<IntradayConfig.Index> indexes;
+    private WebSocketService webSocketService;
 
 
     public TradeManagementService(ShoonyaHelper shoonyaHelper, Misc misc, RiskManagementService riskManagementService,
                                   ShoonyaConfig shoonyaConfig, IntradayConfig intradayConfig,
-                                  ShoonyaLoginService shoonyaLoginService){
+                                  ShoonyaLoginService shoonyaLoginService, WebSocketService webSocketService){
         this.shoonyaHelper = shoonyaHelper;
         this.tradeManager = new TradeManager();
         this.misc = misc;
@@ -98,28 +100,45 @@ public class TradeManagementService {
         this.api = shoonyaLoginService.getApi();
         this.shoonyaConfig = shoonyaConfig;
         this.indexes = intradayConfig.getIndexes();
+        this.webSocketService = webSocketService;
+
+        candleStics = new JSONObject();
     }
 
 
     public void updateOpenOrders(){
-        this.openOrders =  new ArrayList<>();
-        JSONArray orders =  shoonyaHelper.getOpenOrders();
-        for (int i = 0; i < orders.length(); i++) {
-            JSONObject order = orders.getJSONObject(i);
-            openOrders.add(order.toMap());
-        }
+        openOrders =  shoonyaHelper.getOpenOrders();
+        webSocketService .updateOrderFeed(openOrders);
     }
 
     public void eventHandlerOrderUpdate(JSONObject orderUpdate){
         logger.info("order feed {}", orderUpdate);
+
+        ExecutorService executor = null;
         try {
-            updateOrder(wsClient, orderUpdate);
-            updateOpenOrders();
-        } catch (java.lang.Exception e) {
-            logger.error("update order error occured {}", e.getMessage());
-            // Log with the specific line number
-            StackTraceElement element = e.getStackTrace()[0];
-            logger.error("Error occurred at line: {}", element.getLineNumber());
+            executor = Executors.newFixedThreadPool(2);
+            executor.submit(() -> {
+                try {
+                    updateOrder(wsClient, orderUpdate);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            executor.submit(() -> updateOpenOrders());
+
+        }catch (Exception e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow(); // Force shutdown if not terminated
+                }            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -129,6 +148,7 @@ public class TradeManagementService {
 
         if (tickData.has("tk")) {
             String token = tickData.getString("tk");
+            Long epoch = tickData.getLong("ft");
             LocalDateTime timest = LocalDateTime.ofInstant(Instant.ofEpochSecond(tickData.getLong("ft")), ZoneOffset.UTC);
             Map<String, Object> feedData = new HashMap<>();
             feedData.put("tt", timest.toString()); // ISO format
@@ -160,7 +180,24 @@ public class TradeManagementService {
                     try {
                         ltps.put(token, Double.parseDouble(feedJson.get(token).get("ltp").toString()));
 
-                        manageOptionSl(token, ltps.get(token));
+                        // send feed to frontend and backend simultaneously
+                        ExecutorService executor  = null;
+                        try{
+                            executor = Executors.newFixedThreadPool(2);
+                            executor.submit(() ->  manageOptionSl(token, ltps.get(token)));
+                            executor.submit(() ->   webSocketService.sendPriceFeed(token, epoch, ltps.get(token)));
+                        }
+                        finally {
+                            executor.shutdown();
+                            try {
+                                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                                    executor.shutdownNow(); // Force shutdown if not terminated
+                                }            } catch (InterruptedException e) {
+                                executor.shutdownNow();
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+
                     } catch (Exception e) {
                         logger.error("Error with feed occurred: {}", e.getMessage());
                     }
@@ -246,6 +283,7 @@ public class TradeManagementService {
     public void unsubscribe(TokenInfo tokenInfo){
         String instrument = tokenInfo.getInstrument();
         this.wsClient.unsubscribe(instrument, NorenApiJava.FeedType.TOUCHLINE);
+        subscribedTokens.remove(tokenInfo.getInstrument());
         logger.info("unsubscribed from {}", instrument );
     }
 
@@ -273,11 +311,12 @@ public class TradeManagementService {
         List<Double> targets = misc.getTargets(exch, token );
 
 
-        int div = 2;
+        int div = targets.size();
 
         int multiple = qty/(div * minLotSize);
         int remaining = qty - div * minLotSize * multiple;
         PartialTrade trade;
+
 
         if(multiple > 0) {
             logger.info("qty {} is greater than or equal to 3x min_quantity {}", qty, minLotSize);
@@ -294,7 +333,7 @@ public class TradeManagementService {
                 logger.info("for {}, using qty {}", tradeName, tradeQty);
                 trade = new PartialTrade(tradeName, 0, tradeQty, entryPrice,
                         slPrice, maxSlprice,entryPrice + targets.get(i - 1) , "SL-LMT",
-                        pcode, exch, tsym, diff);
+                        pcode, exch, tsym, diff, token);
 
                 this.tradeManager.addTrade(token, tradeName, trade);
             }
@@ -308,7 +347,7 @@ public class TradeManagementService {
                 logger.info("for {}, using qty {}", tradeName, minLotSize);
 
                 trade = new PartialTrade(tradeName, 0, minLotSize, entryPrice, slPrice, maxSlprice, entryPrice + targets.get(j - 1), "SL-LMT",
-                        pcode, exch, tsym, diff);
+                        pcode, exch, tsym, diff, token);
                 this.tradeManager.addTrade(token, tradeName, trade);
             }
         }
@@ -323,6 +362,7 @@ public class TradeManagementService {
             if(!tradeManager.hasToken(token) ){
                 this.lastbuyTime = LocalDateTime.now();
                 createTrade(token, orderUpdate);
+//                candleStics.put(token, shoonyaHelper.getTimePriceSeries())
                 subscribe(new TokenInfo(exch, token,null));
             }
         }
@@ -426,15 +466,32 @@ public class TradeManagementService {
 
         if (orderUpdate.has("rejreason")){
             logger.info("order rejected {}", orderUpdate);
+            webSocketService.sendToast("Order error", orderUpdate.getString("rejreason"));
+
             return;
         }
 
-        handleBuyOrder(wsClient, token, exch, orderUpdate);
-        handleSellOrder(wsClient, token, exch, orderUpdate);
+        ExecutorService executor = null;
+        try {
+            executor = Executors.newFixedThreadPool(2);
+            executor.submit(() -> handleBuyOrder(wsClient, token, exch, orderUpdate));
+            executor.submit(() -> handleSellOrder(wsClient, token, exch, orderUpdate));
+//            executor.submit(() -> webSocketService .updateOrderFeed(openOrders));
+        }
+        finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow(); // Force shutdown if not terminated
+                }            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
 
         if (orderUpdate.getString("status").equals("COMPLETE")){
             riskManagementService.checkRiskManagement();
-            }
+        }
     }
 
     public void placeSl(String pt, String token, PartialTrade trade){
@@ -460,27 +517,32 @@ public class TradeManagementService {
         Double points = ltp - trade.getEntryPrice();
         Double targetPoints = trade.getTargetPrice() - trade.getEntryPrice();
         JSONObject ret;
+        if(trade.getTargetPrice() > 0) {
+            if (points >= 2.0f / 3 * targetPoints && trade.getOrderType().equals("SL-LMT")) {
+                logger.info("modifying sl order from SL-LMT to LIMIT");
+                ret = this.shoonyaHelper.modifyOrder(trade.getExch(), trade.getTsym(), trade.getOrderNumber(), trade.getQty()
+                        , "LMT", trade.getTargetPrice(), null);
+                trade.setOrderType("LMT");
+                logger.info("sl order modified from SL-LMT to LMT with target {}", trade.getTargetPrice());
+                logger.info(ret);
+            }
+            if (points <= 1.0f / 3 * targetPoints && trade.getOrderType().equals("LMT")) {
+                logger.info("modifying target order from LIMIT to SL-LMT ");
 
-        if(points >= 2.0f/3 * targetPoints && trade.getOrderType().equals("SL-LMT")){
-            logger.info("modifying sl order from SL-LMT to LIMIT");
-            ret = this.shoonyaHelper.modifyOrder(trade.getExch(), trade.getTsym(), trade.getOrderNumber() ,trade.getQty()
-                    ,"LMT", trade.getTargetPrice(), null);
-            trade.setOrderType("LMT");
-            logger.info("sl order modified from SL-LMT to LMT with target {}", trade.getTargetPrice());
-            logger.info(ret);
+                ret = this.shoonyaHelper.modifyOrder(trade.getExch(), trade.getTsym(), trade.getOrderNumber(), trade.getQty(),
+                        "SL-LMT", trade.getSlPrice(), trade.getSlPrice() + trade.getDiff());
+                trade.setOrderType("SL-LMT");
+                logger.info("sl order modified from LIMIT to SL-LMT with sl {}", trade.getSlPrice());
+                logger.info(ret);
+            }
+            if (ltp < trade.getMaxSlPrice()) {
+                logger.info("limit sl order crossed, exiting all trades with market orders");
+                exitAllCurrentTrades(token);
+            }
         }
-        if(points <= 1.0f/3 * targetPoints && trade.getOrderType().equals("LMT")){
-            logger.info("modifying target order from LIMIT to SL-LMT ");
+        else{ // trail the price using atr method
+            ;
 
-            ret = this.shoonyaHelper.modifyOrder(trade.getExch(), trade.getTsym(), trade.getOrderNumber() ,trade.getQty() ,
-                    "SL-LMT", trade.getSlPrice(),trade.getSlPrice() + trade.getDiff() );
-            trade.setOrderType("SL-LMT");
-            logger.info("sl order modified from LIMIT to SL-LMT with sl {}", trade.getSlPrice());
-            logger.info(ret);
-        }
-        if(ltp < trade.getMaxSlPrice()){
-            logger.info("limit sl order crossed, exiting all trades with market orders");
-            exitAllCurrentTrades(token);
         }
         tradeManager.updateTrade(token, pt, trade);
     }
@@ -576,7 +638,7 @@ public class TradeManagementService {
     public void test(){
         PartialTrade trade = new PartialTrade("t1", 1, 100, 100.0,
                 96.0, 94.0,110.0 , "LMT",
-                "a", "a", "a", 0.2);
+                "a", "a", "a", 0.2, "");
         this.tradeManager.addTrade("41692", "t1", trade);
 //        manageTrade(103.0,"123", "t1", trade);
         subscribe( new TokenInfo("NFO", "41692", null));

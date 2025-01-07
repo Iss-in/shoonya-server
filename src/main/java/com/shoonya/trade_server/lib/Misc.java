@@ -1,28 +1,40 @@
 package com.shoonya.trade_server.lib;
 import com.shoonya.trade_server.config.IntradayConfig;
+import com.shoonya.trade_server.service.OptionUpdateService;
 import com.shoonya.trade_server.service.StartupService;
 
-import org.slf4j.Logger;
+import lombok.Getter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 import tech.tablesaw.api.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Getter
 @Component
 public class Misc {
 
     private final Map<String, Table > dataFrames;
     private final  List<IntradayConfig.Index> indexes;
 
+    private final LocalDate nseExpiry;
+    private static final Logger logger = LogManager.getLogger(Misc.class.getName());
+
+
     public Misc(StartupService startupService, IntradayConfig intradayConfig){
         this.dataFrames = startupService.getDataFrames();
         this.indexes = intradayConfig.getIndexes();
+        this.nseExpiry = getNseWeeklyExpiry("NIFTY", 0);
     }
 
     public String getToken(String exch, String tsym) {
@@ -57,25 +69,27 @@ public class Misc {
 
         // Parse the "Expiry" column into LocalDate
         StringColumn expiryColumn = filteredTable.stringColumn("Expiry");
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d-MMM-yyyy");
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
+                .parseCaseInsensitive()
+                .appendPattern("dd-MMM-yyyy")
+                .toFormatter();
+
         List<LocalDate> parsedDates = new ArrayList<>();
 
         for (String dateStr : expiryColumn) {
-            parsedDates.add(LocalDate.parse(dateStr.substring(0, 1).toUpperCase() + dateStr.substring(1).toLowerCase(), formatter));
+            try {
+                String toParse = dateStr.substring(0, 4).toUpperCase() + dateStr.substring(4).toLowerCase();
+                //            toParse = dateStr;
+                parsedDates.add(LocalDate.parse(toParse, formatter));
+            } catch (Exception e) {
+                System.err.println("Failed to parse date: " + dateStr + " - " + e.getMessage());
+            }
         }
 
-        // Add the parsed dates back to the table as a new DateColumn
-        DateColumn parsedExpiryColumn = DateColumn.create("ParsedExpiry", parsedDates);
-        filteredTable.addColumns(parsedExpiryColumn);
-
-        // Sort the table by "ParsedExpiry" column
-        Table sortedTable = filteredTable.sortOn("ParsedExpiry");
-
-        // Get the unique expiry dates
-        List<LocalDate> uniqueDates = sortedTable.dateColumn("ParsedExpiry").asList();
-
-        // Return the expiry date for the specified week index
-        return uniqueDates.get(week);
+        Collections.sort(parsedDates);
+        logger.info("expiry date is {}", parsedDates.get(week) );
+        return parsedDates.get(week);
     }
 
     public String getSpotSymbol(String exch, String token) {
@@ -153,6 +167,8 @@ public class Misc {
         }
         return targets;
     }
+
+
 
 }
 

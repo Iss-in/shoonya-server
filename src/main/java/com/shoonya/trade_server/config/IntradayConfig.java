@@ -26,6 +26,7 @@ public class IntradayConfig {
         private double futSl;
         private double maxFutSl;
         private List<Double> targets;
+        private List<Double> trail;
         private double triggerDiff;
     }
 

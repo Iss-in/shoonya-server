@@ -2,6 +2,7 @@ package com.shoonya.trade_server.lib;
 
 import com.noren.javaapi.NorenApiJava;
 import com.shoonya.trade_server.service.ShoonyaLoginService;
+import com.shoonya.trade_server.service.WebSocketService;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -17,8 +18,10 @@ import java.util.concurrent.TimeUnit;
 public class ShoonyaHelper {
 
     private final NorenApiJava api;
-    public ShoonyaHelper(ShoonyaLoginService shoonyaLoginService){
+    private WebSocketService webSocketService;
+    public ShoonyaHelper(ShoonyaLoginService shoonyaLoginService, WebSocketService webSocketService){
         this.api = shoonyaLoginService.getApi();
+        this.webSocketService = webSocketService;
     }
 
     private  static final Logger logger = LoggerFactory.getLogger(ShoonyaHelper.class.getName());
@@ -56,7 +59,7 @@ public class ShoonyaHelper {
         for (int i = 0; i < positions.length(); i++) {
             JSONObject position = positions.getJSONObject(i);
             pnl += position.optFloat("rpnl", 0);   // Add realized PnL, default to 0 if missing
-            mtm += position.optFloat("urmtom", 0); // Add// Add unrealized MTM PnL
+//            mtm += position.optFloat("urmtom", 0); // Add// Add unrealized MTM PnL
         }
 
         return pnl + mtm - getBrokerage();
@@ -82,7 +85,6 @@ public class ShoonyaHelper {
                     count = count + 1;
             }
         }
-        System.out.println("test");
         return count;
     }
 
@@ -102,7 +104,7 @@ public class ShoonyaHelper {
                     case "MKT":
                         logger.debug("Running command api.modifyOrder(exchange={}, tradingsymbol={}, orderNumber={}, " +
                                 "newQuantity={}, newPriceType='MKT', newPrice=0.0)", exchange, tradingsymbol, orderNumber, quantity);
-                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "MKT", 0.0, null, null, null, null);
+                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "MKT", 0.0, 0.0, 0.0, 0.0, 0.0);
 
                         break;
 
@@ -110,13 +112,13 @@ public class ShoonyaHelper {
                         logger.debug("Running command api.modifyOrder(exchange={}, tradingsymbol={}, orderNumber={}, " +
                                         "newQuantity={}, newPriceType='SL-LMT', newPrice={}, newTriggerPrice={})",
                                 exchange, tradingsymbol, orderNumber, quantity, newPrice, newTriggerPrice);
-                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "SL-LMT", newPrice, newTriggerPrice, null, null, null);
+                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "SL-LMT", newPrice, newTriggerPrice, 0.0, 0.0, 0.0);
                         break;
 
                     case "LMT":
                         logger.debug("Running command api.modifyOrder(exchange={}, tradingsymbol={}, orderNumber={}, " +
                                 "newQuantity={}, newPriceType='LMT', newPrice={})", exchange, tradingsymbol, orderNumber, quantity, newPrice);
-                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "LMT", newPrice, null, null, null, null);
+                        res = this.api.modify_order(orderNumber, exchange, tradingsymbol, quantity, "LMT", newPrice, 0.0, 0.0, 0.0, 0.0);
                         break;
 
                     default:
@@ -125,7 +127,13 @@ public class ShoonyaHelper {
                 }
 
                 logger.info("Response: {}", res);
-                currentTries++;
+                // Increment try counter and sleep between attempts
+                if( res.has("rejreason")) {
+                    webSocketService.sendToast("Order error", res.getString("rejreason"));
+                    Thread.sleep(2000);  // Sleep for 2 seconds
+                    currentTries++;
+                    logger.warn("trying to place order again");
+                }
 
                 if (currentTries >= MAX_TRIES) {
                     logger.error("Max attempts to modify order failed");
@@ -157,7 +165,7 @@ public class ShoonyaHelper {
                                 "tradingsymbol={}, quantity={}, discloseqty=0, price_type='MKT', price=0.0, " +
                                 "retention='DAY', remarks='market_order')", orderType, productType, exchange, tradingsymbol, quantity);
 
-                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "MKT", 0.0, "market_order", null, "DAY", null, null, null, null);
+                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "MKT", 0.0, "market_order", 0.0, "DAY", null, 0.0, 0.0, 0.0);
 
                         logger.info("Response: {}", res);
                         break;
@@ -166,7 +174,7 @@ public class ShoonyaHelper {
                                 "tradingsymbol={}, quantity={}, discloseqty=0, price_type='SL-LMT', price={}, " +
                                 "trigger_price={}, retention='DAY', remarks='stop_loss_order')", orderType, productType, exchange, tradingsymbol, quantity, price, triggerPrice);
 
-                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "SL-LMT", price, "stop loss order", triggerPrice, "DAY", null, null, null, null);
+                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "SL-LMT", price, "stop loss order", triggerPrice, "DAY", null, 0.0, 0.0, 0.0);
 
                         logger.info("Response: {}", res);
                         break;
@@ -175,7 +183,7 @@ public class ShoonyaHelper {
                                 "tradingsymbol={}, quantity={}, discloseqty=0, price_type='LMT', price={}, " +
                                 "retention='DAY', remarks='limit_order')", orderType, productType, exchange, tradingsymbol, quantity, price);
 
-                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "LMT", price, "limit sell order", null, "DAY", null, null, null, null);
+                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "LMT", price, "limit sell order", null, "DAY", null, 0.0, 0.0, 0.0);
 
                         logger.info("Response: {}", res);
                         break;
@@ -185,16 +193,24 @@ public class ShoonyaHelper {
                     }
 
                 // Increment try counter and sleep between attempts
-                currentTries++;
-                logger.warn("trying to place order again");
+                if( res.getString("stat").equals("Not_Ok")) {
+                    webSocketService.sendToast("Order error", res.getString("emsg"));
+                    Thread.sleep(2000);  // Sleep for 2 seconds
+                    currentTries++;
+                    logger.warn("trying to place order again");
+                }
+                else
+                    webSocketService.sendToast("Order purchased Successfully","");
+
                 if (currentTries >= MAX_TRIES) {
                     logger.error("Max attempts to place order failed");
                     break;
                 }
-                Thread.sleep(2000);  // Sleep for 2 seconds
             }
         } catch (Exception e) {
             logger.error("Error in placing order: {}", e.getMessage(), e);
+            webSocketService.sendToast("Order error", e.getMessage());
+
             Thread.currentThread().interrupt();
         }
 
@@ -243,10 +259,11 @@ public class ShoonyaHelper {
                 currentTries++;
                 TimeUnit.MILLISECONDS.sleep(100); // Wait 100ms between retries
 
-                if (currentTries >= MAX_TRIES) {
-                    logger.info("Max attempts to call order book API failed");
-                    break;
-                }
+                break;
+//                if (currentTries >= MAX_TRIES) {
+//                    logger.info("Max attempts to call order book API failed");
+//                    break;
+//                }
             }
         } catch (Exception e) {
             logger.error("Error in getting order book: {}", e.getMessage(), e);
@@ -334,6 +351,8 @@ public class ShoonyaHelper {
     public JSONArray getOpenOrders(){
         JSONArray ret =  new JSONArray();
         JSONArray orderBook = getOrderBook();
+        if(orderBook == null)
+            return ret;
 
         for (int i = 0; i < orderBook.length(); i++) {
             JSONObject order = orderBook.getJSONObject(i);
