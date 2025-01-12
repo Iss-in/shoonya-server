@@ -27,10 +27,12 @@ public class RiskManagementService {
     ShoonyaHelper shoonyaHelper;
     IntradayConfig intradayConfig;
     DailyRecordRepository dailyRecordRepository;
+    TradeParserService tradeParserService;
 
     private Logger logger = LoggerFactory.getLogger(RiskManagementService.class.getName());
 
-    public RiskManagementService(ShoonyaHelper shoonyaHelper, IntradayConfig intradayConfig, DailyRecordRepository dailyRecordRepository){
+    public RiskManagementService(ShoonyaHelper shoonyaHelper, IntradayConfig intradayConfig,
+                                 DailyRecordRepository dailyRecordRepository, TradeParserService tradeParserService){
         this.shoonyaHelper = shoonyaHelper;
         this.intradayConfig = intradayConfig;
         this.dailyRecordRepository = dailyRecordRepository;
@@ -39,6 +41,7 @@ public class RiskManagementService {
         this.tradeCount = 0;
         this.maxTradeCount = this.intradayConfig.getMaxTrades();
         this.brokerage = 0;
+        this.tradeParserService = tradeParserService;
         this.maxLoss = getMaxloss();
 
     }
@@ -98,6 +101,7 @@ public class RiskManagementService {
             while (true) {
                 shoonyaHelper.exitAllMarketOrders();
                 shoonyaHelper.withdraw();
+                tradeParserService.checkAndPerformTask(true);
                 TimeUnit.SECONDS.sleep(30);
             }
         }
@@ -111,6 +115,8 @@ public class RiskManagementService {
             logger.warn("Killswitch condition crossed");
             shoonyaHelper.exitAllMarketOrders();
             shoonyaHelper.withdraw();
+            tradeParserService.checkAndPerformTask(true);
+
         }
     }
 

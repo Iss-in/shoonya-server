@@ -7,6 +7,7 @@ import lombok.Getter;
 import org.apache.commons.codec.DecoderException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.security.InvalidKeyException;
@@ -53,6 +54,11 @@ public class ShoonyaLoginService {
                 config.getBankn(), config.getIfscCode(), config.getUpi());
 
         logger.info("login response is {}", response );
+        JSONObject res = new JSONObject(response);
+        if(res.get("stat").equals("Not_Ok")){
+            logger.info("login unsuccessful with error:{}", res.get("emsg"));
+            System.exit(1);
+        }
         return sessionApi;
     }
 }

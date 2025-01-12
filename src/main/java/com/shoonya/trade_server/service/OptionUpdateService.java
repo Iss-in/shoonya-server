@@ -1,6 +1,5 @@
 package com.shoonya.trade_server.service;
 
-import com.shoonya.trade_server.controller.MoneyController;
 import com.shoonya.trade_server.entity.TokenInfo;
 import com.shoonya.trade_server.handler.WebSocketHandler;
 import com.shoonya.trade_server.lib.Misc;
@@ -36,7 +35,8 @@ public class OptionUpdateService {
     public OptionUpdateService(TradeManagementService tradeManagementService, Misc misc, WebSocketService webSocketService
     , ShoonyaHelper shoonyaHelper){
         this.tradeManagementService = tradeManagementService;
-        this.expiry = misc.getNseExpiry();
+//        this.expiry = misc.getNseExpiry();
+        this.expiry = misc.getNiftyExpiry();
         this.webSocketService = webSocketService;
         this.misc = misc;
         this.shoonyaHelper = shoonyaHelper;

@@ -27,14 +27,27 @@ public class Misc {
     private final Map<String, Table > dataFrames;
     private final  List<IntradayConfig.Index> indexes;
 
-    private final LocalDate nseExpiry;
+        private final LocalDate niftyExpiry;
     private static final Logger logger = LogManager.getLogger(Misc.class.getName());
 
 
     public Misc(StartupService startupService, IntradayConfig intradayConfig){
         this.dataFrames = startupService.getDataFrames();
         this.indexes = intradayConfig.getIndexes();
-        this.nseExpiry = getNseWeeklyExpiry("NIFTY", 0);
+        this.niftyExpiry = getNiftyExpiry(0);
+    }
+
+    public LocalDate getNiftyExpiry(int week){
+        LocalDate today = LocalDate.now();
+
+        List<LocalDate> niftyExpiries =  getNseWeeklyExpiries("NIFTY");
+        LocalDate expiry = niftyExpiries.get(week);
+        if(today.isEqual(expiry)) {
+            logger.info("expiry day, change from {} to {}", expiry, niftyExpiries.get(1));
+            expiry = niftyExpiries.get(week+1);
+        }
+        logger.info("nifty expiry is {}", expiry);
+        return expiry;
     }
 
     public String getToken(String exch, String tsym) {
@@ -63,7 +76,7 @@ public class Misc {
     }
 
 
-    public LocalDate getNseWeeklyExpiry(String symbol, int week) {
+    public List<LocalDate> getNseWeeklyExpiries(String symbol) {
         Table df = dataFrames.get("NFO");
         Table filteredTable = df.where(df.stringColumn("Symbol").isEqualTo(symbol));
 
@@ -81,15 +94,17 @@ public class Misc {
             try {
                 String toParse = dateStr.substring(0, 4).toUpperCase() + dateStr.substring(4).toLowerCase();
                 //            toParse = dateStr;
-                parsedDates.add(LocalDate.parse(toParse, formatter));
+                LocalDate expiry = LocalDate.parse(toParse, formatter);
+                if(!parsedDates.contains(expiry))
+                    parsedDates.add(expiry);
             } catch (Exception e) {
                 System.err.println("Failed to parse date: " + dateStr + " - " + e.getMessage());
             }
         }
 
         Collections.sort(parsedDates);
-        logger.info("expiry date is {}", parsedDates.get(week) );
-        return parsedDates.get(week);
+//        logger.info("expiry date is {}", parsedDates.get(week) );
+        return parsedDates;
     }
 
     public String getSpotSymbol(String exch, String token) {

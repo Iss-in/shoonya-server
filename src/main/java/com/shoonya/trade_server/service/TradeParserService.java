@@ -95,17 +95,17 @@ public class TradeParserService {
 
     @Scheduled(fixedRate = 60000) // Check every minute
     public void checkTimePeriodically() {
-        checkAndPerformTask();
+        checkAndPerformTask(false);
     }
 
 
-    private void checkAndPerformTask() {
+    void checkAndPerformTask(boolean manual) {
         if (!taskPerformed && validDay) {
             // Get the current time
             LocalTime currentTime = LocalTime.now();
 
             // Check if the current time is past the threshold time
-            if (currentTime.isAfter(THRESHOLD_TIME)) {
+            if (currentTime.isAfter(THRESHOLD_TIME) || manual) {
                 // Run the desired task
                 parseTrades();
                 taskPerformed = true;
@@ -137,7 +137,7 @@ public class TradeParserService {
         logger.info("Trades uploaded to db for today");
         updateParsedTrades();
         updateDailyRecords();
-        updateMaxRun2();
+        updateMaxRun();
     }
 
     public void updateParsedTrades(){

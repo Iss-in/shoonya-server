@@ -165,3 +165,4 @@ mvnw*
 #TODO: how to deal with test folder and test classes, look into unit tests
 
 /src/main/resources/cred.yaml
+logs/

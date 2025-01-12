@@ -10,6 +10,7 @@ import com.shoonya.trade_server.lib.Misc;
 import com.shoonya.trade_server.lib.ShoonyaWebSocket;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -26,6 +27,61 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.Math.max;
+
+
+@Setter
+@Getter
+class Countdown{
+    private int seconds ;
+    private WebSocketService webSocketService;
+    private Thread timerThread;
+
+    Countdown(int seconds, WebSocketService webSocketService){
+        this.seconds = seconds;
+        this.webSocketService = webSocketService;
+        startTimer();
+    }
+    // Method to start the timer countdown
+    private String format(int seconds){
+        int min = seconds / 60;
+        // Calculate the remaining seconds
+        int sec = seconds % 60;
+
+        // Format the minutes and seconds to ensure two digits
+        String formattedTime = String.format("%02d:%02d", min, sec);
+
+        return formattedTime;
+    }
+    private void startTimer() {
+        stopTimer();
+
+        Thread timerThread = new Thread(() -> {
+            while (seconds >= 0) {
+                try {
+                    Thread.sleep(1000); // Sleep for 1 second
+                    String ts = format(seconds);
+                    webSocketService.updateTimer(ts);
+                    seconds--;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        timerThread.start();
+    }
+
+    public void stopTimer() {
+        if (timerThread != null) {
+            timerThread.interrupt();
+            try {
+                timerThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+}
+
 
 @Getter
 class TradeManager{
@@ -75,6 +131,7 @@ public class TradeManagementService {
     private JSONArray openOrders;
 
     private LocalDateTime lastbuyTime = LocalDateTime.now().minusDays(1);
+    private Countdown timer;
     TradeManager tradeManager;
 
     Misc misc;
@@ -364,6 +421,7 @@ public class TradeManagementService {
                 createTrade(token, orderUpdate);
 //                candleStics.put(token, shoonyaHelper.getTimePriceSeries())
                 subscribe(new TokenInfo(exch, token,null));
+                timer = new Countdown(15 * 60, webSocketService);
             }
         }
     }
@@ -513,6 +571,8 @@ public class TradeManagementService {
     public void manageTrade(Double ltp, String token, String pt, PartialTrade trade){
 
 //        logger.info("ltp for token {} is {}", token, ltp);
+        if(!tradeManager.hasToken(token))
+            return;
 
         Double points = ltp - trade.getEntryPrice();
         Double targetPoints = trade.getTargetPrice() - trade.getEntryPrice();
@@ -573,6 +633,7 @@ public class TradeManagementService {
                 Thread.currentThread().interrupt();
             }
         }
+        tradeManager.removeTrade(token);
     }
 
     public void manageOptionSl(String token, Double ltp ){

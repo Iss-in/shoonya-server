@@ -6,10 +6,9 @@ import com.shoonya.trade_server.entity.Trade;
 import com.shoonya.trade_server.lib.Misc;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import com.shoonya.trade_server.repositories.TradeRepository;
-import com.shoonya.trade_server.service.OptionUpdateService;
-import com.shoonya.trade_server.service.RiskManagementService;
-import com.shoonya.trade_server.service.TradeParserService;
-import com.shoonya.trade_server.service.WebSocketService;
+import com.shoonya.trade_server.service.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -87,7 +86,7 @@ public class TestController {
 
 
 
-    @GetMapping("/test/{tsym}")
+    @GetMapping("/fetchHistoricalData/{tsym}")
     public List<Map<String, Object>> test(@PathVariable String tsym) {
         // Get the token for the given symbol
         String token = misc.getToken("NFO", tsym);
@@ -121,5 +120,66 @@ public class TestController {
         list.reversed();
 
         return list;
+    }
+
+    Countdown timer;
+    @PostMapping("/test")
+    public ResponseEntity<String> test() {
+        timer = new Countdown(10, webSocketService);
+        return ResponseEntity.ok("Session ended");
+    }
+
+}
+
+@Setter
+@Getter
+class Countdown{
+    private int seconds ;
+    private WebSocketService webSocketService;
+    private Thread timerThread;
+
+    Countdown(int seconds, WebSocketService webSocketService){
+        this.seconds = seconds;
+        this.webSocketService = webSocketService;
+        startTimer();
+    }
+    // Method to start the timer countdown
+    private String format(int seconds){
+        int min = seconds / 60;
+        // Calculate the remaining seconds
+        int sec = seconds % 60;
+
+        // Format the minutes and seconds to ensure two digits
+        String formattedTime = String.format("%02d:%02d", min, sec);
+
+        return formattedTime;
+    }
+    private void startTimer() {
+        stopTimer();
+
+        Thread timerThread = new Thread(() -> {
+            while (seconds >= 0) {
+                try {
+                    Thread.sleep(1000); // Sleep for 1 second
+                    String ts = format(seconds);
+                    webSocketService.updateTimer(ts);
+                    seconds--;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        timerThread.start();
+    }
+
+    public void stopTimer() {
+        if (timerThread != null) {
+            timerThread.interrupt();
+            try {
+                timerThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }

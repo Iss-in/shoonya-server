@@ -183,4 +183,13 @@ public class WebSocketService {
         String message = res.toString();
         sendMessage(res.toString());
     }
+
+    public void updateTimer(String timer){
+        JSONObject res  =  new JSONObject();
+        res.put("type", "timer");
+        res.put("left", timer);
+        String message = res.toString();
+        sendMessage(res.toString());
+    }
+
 }
