@@ -1,0 +1,29 @@
+server:
+  port: 8090
+spring:
+  application:
+    name: trade-server
+  config:
+    import: classpath:cred.yaml
+  datasource:
+    continue-on-error: true
+    driver-class-name: org.postgresql.Driver
+    initialization-mode: always
+    password: password
+    url: jdbc:postgresql://100.115.108.27:5432/postgres
+    username: user
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+  task:
+    scheduling:
+      enabled: true
+custom:
+  logger:
+    folder: logs
+    level: info
