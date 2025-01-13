@@ -10,8 +10,8 @@ services:
       - "8090:8090"
       - "5005:5005"  # Debug port
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
-      - JAVA_OPTS=-Xmx512m -Xms256m
+#      - SPRING_PROFILES_ACTIVE=dev
+#      - JAVA_OPTS=-Xmx512m -Xms256m
       - TZ=Asia/Kolkata
     volumes:
       - /home/kushy/Projects/shoonya_app/shoonya-server/logs:/logs
@@ -21,7 +21,7 @@ services:
 #      - /etc/timezone:/etc/timezone:ro
 #      - /etc/localtime:/etc/localtime:ro
 
-    restart: unless-stopped
+    restart: no
     networks:
       - docker_network
     healthcheck:
