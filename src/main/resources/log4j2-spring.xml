@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Properties>
-        <Property name="LOG_PATH">${sys:dynamic.log.folder.name:-logs}</Property>
-        <Property name="LOG_FILE">shoonya-${date:dd-MM-YY}.log</Property>
+        <Property name="LOG_PATH">${spring:custom.logger.folder:-logs}</Property>
+        <Property name="LOG_FILE">shoonya-${date:yyyy-MM-dd}.log</Property>
     </Properties>
     <Appenders>
         <Console name="ConsoleAppender" target="SYSTEM_OUT">
@@ -18,7 +18,7 @@
         </RollingFile>
     </Appenders>
     <Loggers>
-        <Root level="info">
+        <Root level="${spring:custom.logger.level:-info}">
             <AppenderRef ref="ConsoleAppender"/>
             <AppenderRef ref="FileAppender"/>
         </Root>

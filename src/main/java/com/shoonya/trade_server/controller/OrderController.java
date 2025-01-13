@@ -44,7 +44,7 @@ public class OrderController {
         if(priceType.equals("SL-LMT"))
             triggerPrice = price - 0.2;
 
-        JSONObject res = shoonyaHelper.placeOrder("B", "M", "NFO", symbol, 150, priceType
+        JSONObject res = shoonyaHelper.placeOrder("B", "M", "NFO", symbol, 75, priceType
                 , price, triggerPrice);
         logger.info("status:", res.toString());
 //        TODO: pass on correct response to response entity

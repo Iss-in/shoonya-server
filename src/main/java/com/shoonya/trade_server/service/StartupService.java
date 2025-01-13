@@ -16,6 +16,7 @@ import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;

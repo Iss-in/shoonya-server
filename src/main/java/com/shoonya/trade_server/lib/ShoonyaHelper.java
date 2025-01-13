@@ -43,7 +43,7 @@ public class ShoonyaHelper {
 
         double brokerage = 0;
         if(ret.has("brokerage"))
-            brokerage = ret.getFloat("brokerage");
+            brokerage = ret.getDouble("brokerage");
         return brokerage;
     }
 
@@ -58,7 +58,9 @@ public class ShoonyaHelper {
 
         for (int i = 0; i < positions.length(); i++) {
             JSONObject position = positions.getJSONObject(i);
-            pnl += position.optFloat("rpnl", 0);   // Add realized PnL, default to 0 if missing
+            if(position.has("rpnl"))
+                pnl += position.getDouble("rpnl");
+            float x = position.getFloat("rpnl");// Add realized PnL, default to 0 if missing
 //            mtm += position.optFloat("urmtom", 0); // Add// Add unrealized MTM PnL
         }
 
@@ -335,7 +337,7 @@ public class ShoonyaHelper {
     public JSONObject withdraw(){
         JSONObject res = new JSONObject();
         try{
-            float maxpay = this.api.get_max_payout_amount().getFloat("payout") -1;
+            double maxpay = this.api.get_max_payout_amount().getDouble("payout") -1;
             if(maxpay > 10) {
                 logger.info("withdrawing money {}", maxpay);
                 res = this.api.funds_payout("" + maxpay, "" + maxpay * -100);

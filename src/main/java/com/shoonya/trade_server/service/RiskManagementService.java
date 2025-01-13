@@ -56,7 +56,7 @@ public class RiskManagementService {
             logger.info("record not found for {}", date);
         }
         logger.info("max loss for today is {}", maxLoss);
-        return maxLoss;
+         return maxLoss;
     }
 
     @Scheduled(fixedRate = 60000)

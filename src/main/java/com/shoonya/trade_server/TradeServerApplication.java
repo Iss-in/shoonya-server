@@ -12,6 +12,7 @@ public class TradeServerApplication {
 	public static final Logger logger = LogManager.getLogger(TradeServerApplication.class.getName());
 
 	public static void main(String[] args) {
+		System.setProperty("LOG_EXCEPTION_CONVERSION_WORD", "%throwable");
 		SpringApplication.run(TradeServerApplication.class, args);
 		logger.info("Hello and Welcome to Shoonya trade app");
 

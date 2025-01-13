@@ -8,6 +8,7 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import java.security.InvalidKeyException;
@@ -19,6 +20,7 @@ import org.apache.commons.codec.binary.Hex;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import static com.shoonya.trade_server.service.ShoonyaLoginService.logger;
 import static com.shoonya.trade_server.service.TOTPGenerator.generateTOTP;
 
 @Service
@@ -26,19 +28,21 @@ public class ShoonyaLoginService {
 
     private ShoonyaConfig config;
 
-    public ShoonyaLoginService(ShoonyaConfig config){
-        this.config = config;
-    }
-
     @Getter
     private NorenApiJava api;
+
     public static final Logger logger = LogManager.getLogger(ShoonyaLoginService.class.getName());
 
-    @PostConstruct
-    public void login() {
+    public ShoonyaLoginService(ShoonyaConfig config){
+
+        String classpath = System.getProperty("java.class.path");
+        logger.error(classpath);
+        this.config = config;
         logger.info("initiating api login");
         this.api = loginToApi();
     }
+
+
 
     private NorenApiJava loginToApi(){
 
@@ -46,6 +50,7 @@ public class ShoonyaLoginService {
 
         NorenApiJava sessionApi = new com.noren.javaapi.NorenApiJava(host);
         String totpKey = config.getTotpKey();
+        logger.info("totp key is x- {}", totpKey);
 
         String twoFa =  generateTOTP(totpKey, 6);
         logger.info("totp is {}", twoFa );

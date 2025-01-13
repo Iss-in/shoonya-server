@@ -94,6 +94,7 @@ public class WebSocketService {
                 }
             } else {
                 logger.warn("WebSocket session is not open");
+//                Thread.sleep(1000);
                 break;
             }
         }

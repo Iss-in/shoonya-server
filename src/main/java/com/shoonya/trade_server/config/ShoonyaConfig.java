@@ -1,6 +1,8 @@
 package com.shoonya.trade_server.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,7 +11,7 @@ import java.util.List;
 
 @Getter
 @Setter
-@Component
+@Configuration
 @ConfigurationProperties(prefix = "shoonya")
 public class ShoonyaConfig {
     private String user;
@@ -35,5 +37,8 @@ public class ShoonyaConfig {
     public static class Exchange {
         private String name;
         private String fileUri;
+    }
+    public String getTotpKey(){
+        return totpKey;
     }
 }
