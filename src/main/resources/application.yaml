@@ -5,13 +5,19 @@ spring:
     name: trade-server
   config:
     import: classpath:cred.yaml
+
   datasource:
-    continue-on-error: true
-    driver-class-name: org.postgresql.Driver
-    initialization-mode: always
-    password: password
-    url: jdbc:postgresql://100.115.108.27:5432/postgres
-    username: user
+    primary:
+      url: jdbc:postgresql://100.115.108.27:5432/postgres
+      username: user
+      password: password
+      driver-class-name: org.postgresql.Driver
+    secondary:
+      url: jdbc:postgresql://192.168.1.53:5432/postgres
+      username: user
+      password: password
+      driver-class-name: org.postgresql.Driver
+
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -20,6 +26,7 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
+      continue-on-error: true
   task:
     scheduling:
       enabled: true

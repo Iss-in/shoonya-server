@@ -2,23 +2,31 @@ package com.shoonya.trade_server.service;
 import com.neovisionaries.ws.client.WebSocketException;
 import com.shoonya.trade_server.config.IntradayConfig;
 import com.shoonya.trade_server.config.ShoonyaConfig;
+import com.shoonya.trade_server.entity.DailyRecord;
+import com.shoonya.trade_server.entity.SessionVars;
+import com.shoonya.trade_server.exceptions.RecordNotFoundException;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import com.noren.javaapi.NorenApiJava;
 import com.shoonya.trade_server.entity.PartialTrade;
+
 import com.shoonya.trade_server.entity.TokenInfo;
 import com.shoonya.trade_server.lib.Misc;
 import com.shoonya.trade_server.lib.ShoonyaWebSocket;
+import com.shoonya.trade_server.repositories.DailyRecordRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hibernate.Session;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -27,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 
 @Setter
@@ -114,6 +123,12 @@ class TradeManager{
     public boolean hasToken(String token){
         return trades.containsKey(token);
     }
+
+    public boolean isTradeActive(){
+        if(trades.size() != 0)
+            return true;
+        return false;
+    }
 }
 
 @Getter
@@ -127,12 +142,14 @@ public class TradeManagementService {
     private  final Map<String, Map<String, Object>> feedJson = new HashMap<>();
     private  final Map<String, Double> ltps = new HashMap<>();
     private List <String> subscribedTokens = new ArrayList<>();
+    int buyQty;
 
     private JSONArray openOrders;
 
     private LocalDateTime lastbuyTime = LocalDateTime.now().minusDays(1);
     private Countdown timer;
     TradeManager tradeManager;
+    int maxLoss;
 
     Misc misc;
 
@@ -140,16 +157,17 @@ public class TradeManagementService {
     RiskManagementService riskManagementService;
     ShoonyaConfig shoonyaConfig;
     NorenApiJava api;
-    private JSONObject candleStics;
 
     private IntradayConfig intradayConfig;
     private List<IntradayConfig.Index> indexes;
     private WebSocketService webSocketService;
+    private DailyRecordRepository dailyRecordRepository;
 
 
     public TradeManagementService(ShoonyaHelper shoonyaHelper, Misc misc, RiskManagementService riskManagementService,
                                   ShoonyaConfig shoonyaConfig, IntradayConfig intradayConfig,
-                                  ShoonyaLoginService shoonyaLoginService, WebSocketService webSocketService){
+                                  ShoonyaLoginService shoonyaLoginService, WebSocketService webSocketService,
+                                  DailyRecordRepository dailyRecordRepository, SessionVars sessionVars) {
         this.shoonyaHelper = shoonyaHelper;
         this.tradeManager = new TradeManager();
         this.misc = misc;
@@ -158,9 +176,11 @@ public class TradeManagementService {
         this.shoonyaConfig = shoonyaConfig;
         this.indexes = intradayConfig.getIndexes();
         this.webSocketService = webSocketService;
-
-        candleStics = new JSONObject();
+        this.buyQty = sessionVars.getBuyQty();
+        this.maxLoss = sessionVars.getMaxLoss();
+        this.dailyRecordRepository = dailyRecordRepository;
     }
+
 
 
     public void updateOpenOrders(){
@@ -310,6 +330,7 @@ public class TradeManagementService {
         this.wsClient.connect();
         //TODO: use asynchronous? what is the use
         while (!this.feedOpened)
+//            logger.info("sleeping till feed opens");
             TimeUnit.SECONDS.sleep(1);
 
     }
@@ -373,7 +394,7 @@ public class TradeManagementService {
         int multiple = qty/(div * minLotSize);
         int remaining = qty - div * minLotSize * multiple;
         PartialTrade trade;
-
+        logger.info("order qty {} = {} X {} + {}", qty, minLotSize, multiple, remaining);
 
         if(multiple > 0) {
             logger.info("qty {} is greater than or equal to 3x min_quantity {}", qty, minLotSize);
@@ -397,7 +418,7 @@ public class TradeManagementService {
         }
 
         else if(remaining > 0){
-            logger.info("qty {} less than {} x min quantity {}", qty,  div , minLotSize);
+            logger.info("qty {} <= {} x min quantity {}", qty,  div , minLotSize);
             multiple = qty / minLotSize;
             for (int j=1; j < multiple+1; j++){
                 String tradeName = "t" + j;
@@ -418,6 +439,7 @@ public class TradeManagementService {
                 (orderUpdate.getString("trantype").equals("B")  && orderUpdate.getString("status").equals("CANCELED") && orderUpdate.has("fillshares"))){
             if(!tradeManager.hasToken(token) ){
                 this.lastbuyTime = LocalDateTime.now();
+                logger.info("starting a fresh trade at {}", this.lastbuyTime);
                 createTrade(token, orderUpdate);
 //                candleStics.put(token, shoonyaHelper.getTimePriceSeries())
                 subscribe(new TokenInfo(exch, token,null));
@@ -522,7 +544,7 @@ public class TradeManagementService {
         String tsym = orderUpdate.getString("tsym");
         String token = misc.getToken(exch, tsym);
 
-        if (orderUpdate.has("rejreason")){
+        if (orderUpdate.has("rejreason") && orderUpdate.getString("rejreason").trim().length() > 0){
             logger.info("order rejected {}", orderUpdate);
             webSocketService.sendToast("Order error", orderUpdate.getString("rejreason"));
 
@@ -641,7 +663,6 @@ public class TradeManagementService {
             logger.debug("trade status false or current token is not of current trade");
             return;
         }
-
         Map<String, PartialTrade> trades = tradeManager.getTrade(token);
         ExecutorService executor = null;
 

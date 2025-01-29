@@ -1,7 +1,9 @@
 package com.shoonya.trade_server.service;
 
+import com.shoonya.trade_server.entity.SessionVars;
 import com.shoonya.trade_server.entity.TokenInfo;
 import com.shoonya.trade_server.handler.WebSocketHandler;
+import com.shoonya.trade_server.lib.Mibian;
 import com.shoonya.trade_server.lib.Misc;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import lombok.Getter;
@@ -16,11 +18,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Getter
 @Service
@@ -31,21 +37,42 @@ public class OptionUpdateService {
     private ShoonyaHelper shoonyaHelper;
     private Misc misc;
     LocalDate expiry;
+    Mibian mibian;
 
     public OptionUpdateService(TradeManagementService tradeManagementService, Misc misc, WebSocketService webSocketService
-    , ShoonyaHelper shoonyaHelper){
+    , ShoonyaHelper shoonyaHelper, Mibian mibian, SessionVars sessionVars) {
         this.tradeManagementService = tradeManagementService;
 //        this.expiry = misc.getNseExpiry();
-        this.expiry = misc.getNiftyExpiry();
+        this.expiry = sessionVars.getNiftyExpiry();
         this.webSocketService = webSocketService;
         this.misc = misc;
         this.shoonyaHelper = shoonyaHelper;
+        this.mibian = mibian;
+        updateAtmoptions();
+
     }
+
+    public void updateAtmoptions()  {
+        Map<String, Double> ltps =  tradeManagementService.getLtps();
+        try {
+            while (!ltps.containsKey("26000")) {
+                Thread.sleep(1000);
+                logger.info("sleeping waiting for to subscribe nifty token");
+            }
+        } catch (Exception e){
+            logger.error(e.getMessage());
+        }
+        int latestPrice = (int) Math.round(ltps.get("26000"));
+        latestPrice = (latestPrice + 25) / 50 * 50;
+        this.atmCe = latestPrice;
+        this.atmPe = this.atmCe;
+    }
+
 
     private static final Logger logger = LogManager.getLogger(OptionUpdateService.class.getName());
 //    LocalDate expiry = this.misc.getNseExpiry();
     private String ceTsym , ceToken, peTsym, peToken;
-    private int atmCe = 0, atmPe = 0;
+    private int atmCe ,atmPe ;
 
     @Scheduled(fixedRate = 2000)
     public void pollLatestOptions() throws InterruptedException {
@@ -54,10 +81,7 @@ public class OptionUpdateService {
 
     public void setLastestOptions(boolean reset) throws InterruptedException {
 
-        if(reset) {
-            this.atmCe = 0;
-            this.atmPe = 0;
-        }
+
 
         Map<String, Double> ltps = tradeManagementService.getLtps();
         int indexPrice = (int) Math.round(ltps.get("26000"));
@@ -65,23 +89,13 @@ public class OptionUpdateService {
         // Adjust index price to the nearest multiple of 50
         int roundedIndexPrice = (indexPrice + 25) / 50 * 50;
 
-        int[] newPrices = getClosestATMOptions(roundedIndexPrice);
+        boolean flag = getClosestATMOptions(roundedIndexPrice);
 
-        boolean flag = false;
+        // do not update options if trade is active
+        if(tradeManagementService.getTradeManager().isTradeActive())
+            return;
 
-        if(Math.abs(indexPrice - this.atmCe) > 30 &&  this.atmCe != newPrices[0] ) {
-            logger.info("atm ce strike changed from {} to {}",  this.atmCe , newPrices[0]);
-            this.atmCe = newPrices[0];
-            flag = true;
-        }
-
-        if(Math.abs(indexPrice - this.atmPe) > 30 &&  this.atmPe != newPrices[1] ) {
-            logger.info("atm pe strike changed from {} to {}",  this.atmPe ,  newPrices[1]);
-            this.atmPe = newPrices[1];
-            flag = true;
-        }
-
-        if(flag) {
+        if(flag || reset) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("ddMMMyy");
             String formattedDate = expiry.format(formatter).toUpperCase(); // Ensure the month is in uppercase
 
@@ -110,28 +124,73 @@ public class OptionUpdateService {
         return strikes;
     }
 
+    public double getDelta(int indexPrice ,int strikePrice){
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiryEnd = expiry.atTime(15, 29, 59);
+        int days = (int) (Duration.between(now, expiryEnd  ).getSeconds() / 86400);
+        Mibian.BS bs = new Mibian.BS(new double[]{indexPrice, strikePrice, 7, days}, 18.0, null, null, null);
+        double delta = bs.getCallDelta();
+        return delta;
+    }
+
+    public List<Double> generateDeltas(int indexPrice, LocalDate expiry, List<Integer> strikes ){
+        List<Double> deltas = new ArrayList<>();
+        for(int strikePrice:strikes){
+            double delta = getDelta(indexPrice, strikePrice);
+            deltas.add(delta);
+        }
+
+        return deltas;
+    }
     // Function to find closest ATM options
-    public static int[] getClosestATMOptions(int indexPrice) {
+    public boolean isWithinThreshold(double currentDelta, double targetDelta, double threshold){
+        if(targetDelta - threshold <= currentDelta && currentDelta <= targetDelta + threshold)
+            return true;
+        return false;
+    }
+
+    public boolean getClosestATMOptions(int indexPrice) {
+        boolean flag = false;
         List<Integer> strikes = generateStrikePrices(indexPrice, 50, 5);
 
-        int closestCall = 0;
-        int closestPut = 0;
-        int closestCallDiff = Integer.MAX_VALUE;
-        int closestPutDiff = Integer.MAX_VALUE;
+        List<Double> callDeltas = generateDeltas(indexPrice, this.expiry, strikes);
+        List<Double> putDeltas = new ArrayList<>();
 
-        for (int strike : strikes) {
-            int diff = Math.abs(indexPrice - strike);
+        // Calculate putDeltas as 1 - corresponding callDelta
+        for (Double callDelta : callDeltas) {
+            putDeltas.add(1 - callDelta);
+        }
 
-            if (strike >= indexPrice && diff < closestCallDiff) {
-                closestCallDiff = diff;
-                closestCall = strike;
-            } else if (strike <= indexPrice && diff < closestPutDiff) {
-                closestPutDiff = diff;
-                closestPut = strike;
+        double currentCallDelta = getDelta(indexPrice, this.atmCe);
+        double currentPutDelta = 1 - getDelta(indexPrice, this.atmPe);
+
+        double newCallDelta = 0;int callDeltaIndex = 0;
+        for(callDeltaIndex = callDeltas.size() -1 ;callDeltaIndex >= 0; callDeltaIndex--){
+            double targetCallDelta = callDeltas.get(callDeltaIndex);
+            if(targetCallDelta >= 0.5){
+                newCallDelta = targetCallDelta;
+                break;
+            }
+        }
+        double newPutDelta = 0; int putDeltaIndex = 0;
+        for(putDeltaIndex = 0;putDeltaIndex < putDeltas.size();putDeltaIndex++){
+            double targetPutDelta = putDeltas.get(putDeltaIndex);
+            if(targetPutDelta >= 0.5){
+                newPutDelta = targetPutDelta;
+                break;
             }
         }
 
-        return new int[]{closestCall, closestPut};
+        if(Math.abs(newCallDelta - currentCallDelta) > 0.05 ||  currentCallDelta < 0.5) {
+            this.atmCe = strikes.get(callDeltaIndex);
+            flag = true;
+        }
+
+        if(Math.abs(newPutDelta - currentPutDelta) > 0.05 ||  currentPutDelta < 0.5) {
+            this.atmPe = strikes.get(putDeltaIndex);
+            flag = true;
+        }
+        return flag;
     }
 
 }

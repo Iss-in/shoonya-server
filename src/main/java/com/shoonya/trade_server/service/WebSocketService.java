@@ -85,7 +85,7 @@ public class WebSocketService {
                     String nextMessage = queue.poll();
                     if (nextMessage != null) {
                         session.sendMessage(new TextMessage(nextMessage));
-                        logger.info("Sent message: {}", nextMessage);
+                        logger.debug("Sent message: {}", nextMessage);
                     }
                 } catch (IllegalStateException e) {
                     logger.warn("WebSocket session is in an invalid state: {}", e.getMessage());
@@ -93,7 +93,7 @@ public class WebSocketService {
                     logger.error("Failed to send message: {}", e.getMessage());
                 }
             } else {
-                logger.warn("WebSocket session is not open");
+                logger.debug("WebSocket session is not open");
 //                Thread.sleep(1000);
                 break;
             }

@@ -28,12 +28,18 @@ public class ShoonyaHelper {
 
     public JSONArray getTradebook(){
 
-        return this.api.get_trade_book();
+        JSONArray res =  this.api.get_trade_book();
+        if(res == null)
+            return new JSONArray();
+        return res;
     }
 
     public JSONArray getPositions(){
 
-        return this.api.get_positions();
+        JSONArray res =  this.api.get_positions();
+        if(res == null)
+            return new JSONArray();
+        return res;
     }
 
     public double getBrokerage(){
@@ -58,14 +64,14 @@ public class ShoonyaHelper {
 
         for (int i = 0; i < positions.length(); i++) {
             JSONObject position = positions.getJSONObject(i);
-            if(position.has("rpnl"))
+            if(position.has("rpnl")){
                 pnl += position.getDouble("rpnl");
-            float x = position.getFloat("rpnl");// Add realized PnL, default to 0 if missing
-//            mtm += position.optFloat("urmtom", 0); // Add// Add unrealized MTM PnL
+                mtm += position.getDouble("urmtom"); // Add// Add unrealized MTM PnL
+            }
         }
-
-        return pnl + mtm - getBrokerage();
-
+        
+        double brokerage = getBrokerage();
+        return pnl + mtm - brokerage;
     }
 
     public int getTradeCount() {
@@ -83,8 +89,16 @@ public class ShoonyaHelper {
             if (!order_uid.contains(order_id)) {
                 order_uid.add(order_id);
                 finalOrders.add(order);
-                if(order.getString("trantype") .equals("B"))
-                    count = count + 1;
+            }
+        }
+        int netQty = 0;
+        for(JSONObject order:finalOrders){
+            if(order.getString("trantype").equals("B"))
+                netQty += order.getInt("qty");
+            if(order.getString("trantype").equals("S")) {
+                netQty -= order.getInt("qty");
+                if (netQty == 0)
+                    count++;
             }
         }
         return count;
@@ -185,7 +199,7 @@ public class ShoonyaHelper {
                                 "tradingsymbol={}, quantity={}, discloseqty=0, price_type='LMT', price={}, " +
                                 "retention='DAY', remarks='limit_order')", orderType, productType, exchange, tradingsymbol, quantity, price);
 
-                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "LMT", price, "limit sell order", null, "DAY", null, 0.0, 0.0, 0.0);
+                        res = this.api.place_order(orderType, productType, exchange, tradingsymbol, quantity, 0, "LMT", price, "limit order", null, "DAY", null, 0.0, 0.0, 0.0);
 
                         logger.info("Response: {}", res);
                         break;

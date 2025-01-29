@@ -109,6 +109,10 @@ public class TradeParserService {
                 // Run the desired task
                 parseTrades();
                 taskPerformed = true;
+                if (currentTime.isAfter(THRESHOLD_TIME)) {
+                    logger.info("trade session over, exiting app");
+                    System.exit(0);
+                }
             }
         }
     }
@@ -116,6 +120,7 @@ public class TradeParserService {
     // TODO: add a valid trading day variable, put 0 manually when needed in case of holiday ?
     public void parseTrades(){
         JSONArray res = shoonyaHelper.getTradebook();
+
         List<String> orderUid = new ArrayList<>();
         for (int i = res.length() -1; i >=0; i--) {
             JSONObject order = res.getJSONObject(i);
@@ -142,9 +147,9 @@ public class TradeParserService {
 
     public void updateParsedTrades(){
         LocalDate today = LocalDate.now();
-//        LocalDate today = LocalDate.now().minusDays(1);
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+//        LocalDate today = LocalDate.now().minusDays(0);
+        LocalDateTime startOfDay = today.minusDays(0).atStartOfDay();
+        LocalDateTime endOfDay = today.minusDays(0).atTime(23, 59, 59);
 
         List<Trade> trades = tradeRepository.findTradesByDate(startOfDay, endOfDay);
         List<ParsedTrade> parsedTrades = new ArrayList<>();
@@ -200,9 +205,9 @@ public class TradeParserService {
     }
     public  LocalDate getPreviousNonWeekendDay(LocalDate date) {
         // Decrement the date until it's not Saturday or Sunday
-        date = date.minusDays(1);
+        date = date.minusDays(0);
         while (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-            date = date.minusDays(1);
+            date = date.minusDays(0);
         }
         return date;
     }
@@ -220,7 +225,7 @@ public class TradeParserService {
     // TODO: get maxLoss without updating today ?, update today at eod only
     // TODO: successful trades part -- check if it work
     public void updateDailyRecords(){
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now().minusDays(0);
         LocalDate nextDay = getNextNonWeekendDay(today);
         LocalDate prevDay = getPreviousNonWeekendDay(today);
 
@@ -241,7 +246,7 @@ public class TradeParserService {
         for (DailyRecord record:records)
             total += record.getPnl();
         double maxLoss =  total/records.size();
-        maxLoss = max(1000, maxLoss);
+        maxLoss = max(1500, maxLoss);
 
         int successfulTrades = parsedTradeRepository.countByColumnValueExceeds(5, today);
         DailyRecord todayRecord = dailyRecordRepository.findRecordByDate(today);
@@ -263,67 +268,76 @@ public class TradeParserService {
     }
 
     public void updateMaxRun(){
-        LocalDate today = LocalDate.now();
-//        LocalDate yesterday = today.minusDays(1);
-        List<ParsedTrade> parsedTrades = parsedTradeRepository.getTradesByDate(today);
+        LocalDate today = LocalDate.now().minusDays(0);;
+//        LocalDate yesterday = today.minusDays(0);
+        try{
+            List<ParsedTrade> parsedTrades = parsedTradeRepository.getTradesByDate(today);
 
-        int tradeCount = 1;
-        for(ParsedTrade parsedTrade:parsedTrades){
-            LocalDateTime buyTime = parsedTrade.getBuyTime();
-            String tradingSymbol = parsedTrade.getTradingSymbol();
-            String exch = parsedTrade.getExch();
-            String token = misc.getToken(exch, tradingSymbol);
-            double maxPoints = 0;
-            double buyPrice = parsedTrade.getBuyPrice();
-            double points = parsedTrade.getSellPrice() - buyPrice;
-            double slPoints  =  misc.getMaxSl(exch, token) / 2;
-            if(points < 0)
-                maxPoints = points;
-            else {
-                double slPrice = buyPrice - slPoints;
-                List<Double> targets = misc.getTargets(exch, token);
-                List<Double> targetsReached = new ArrayList<>();
+            int tradeCount = 1;
+            for(ParsedTrade parsedTrade:parsedTrades) {
+                LocalDateTime buyTime = parsedTrade.getBuyTime();
+                String tradingSymbol = parsedTrade.getTradingSymbol();
+                String exch = parsedTrade.getExch();
+                String token = misc.getToken(exch, tradingSymbol);
+                double maxPoints = 0;
+                double buyPrice = parsedTrade.getBuyPrice();
+                double points = parsedTrade.getSellPrice() - buyPrice;
+                double slPoints = misc.getMaxSl(exch, token) / 2;
+                if (points < 0)
+                    maxPoints = points;
+                else {
+                    double slPrice = buyPrice - slPoints;
+                    List<Double> targets = misc.getTargets(exch, token);
+                    List<Double> targetsReached = new ArrayList<>();
 
-                long buyTs = buyTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() / 1000;
+                    long buyTs = buyTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() / 1000;
 
-                JSONArray timePriceSeries = shoonyaHelper.getTimePriceSeries(exch, token, "" + buyTs,
-                        null, "1");
-                for (int i = timePriceSeries.length()-2;i>=0; i--) {
-                    JSONObject candle = timePriceSeries.getJSONObject(i);
-                    double high = candle.getDouble("inth");
-                    double low = candle.getDouble("intl");
-                    double currentPoints = high - buyPrice;
-                    String timestamp = candle.getString("time");
-                    if (low < slPrice) {
-                        maxPoints = slPrice - buyPrice;
-                        break;
+                    JSONArray timePriceSeries = shoonyaHelper.getTimePriceSeries(exch, token, "" + buyTs,
+                            null, "1");
+                    if (timePriceSeries == null) {
+                        logger.error("timeprice series to do post trade analysis is null");
+                        return;
                     }
-                    for (double target : targets) {
-                        if (high > target + buyPrice && !targetsReached.contains(target)) {
-                            targetsReached.add(target);
-                            maxPoints += target / 2;
+
+                    for (int i = timePriceSeries.length() - 2; i >= 0; i--) {
+                        JSONObject candle = timePriceSeries.getJSONObject(i);
+                        double high = candle.getDouble("inth");
+                        double low = candle.getDouble("intl");
+                        double currentPoints = high - buyPrice;
+                        String timestamp = candle.getString("time");
+                        if (low < slPrice) {
+                            maxPoints = slPrice - buyPrice;
+                            break;
+                        }
+                        for (double target : targets) {
+                            if (high > target + buyPrice && !targetsReached.contains(target)) {
+                                targetsReached.add(target);
+                                maxPoints += target / 2;
+                            }
+                            if (2 == targetsReached.size())
+                                break;
                         }
                         if (2 == targetsReached.size())
                             break;
+
                     }
-                    if (2 == targetsReached.size())
-                        break;
-
                 }
+                maxPoints = Math.round(maxPoints * 10.0) / 10.0;
+                maxPoints = Math.max(-1 * slPoints, maxPoints);
+                logger.info("max points for trade {} are {}", tradeCount++, maxPoints);
+                parsedTrade.setMaxPoints(maxPoints);
+                parsedTradeRepository.save(parsedTrade);
             }
-            maxPoints = Math.round(maxPoints * 10.0) / 10.0;
-            maxPoints = Math.max(-1 * slPoints, maxPoints);
-            logger.info("max points for trade {} are {}" ,tradeCount++ , maxPoints);
-            parsedTrade.setMaxPoints(maxPoints);
-            parsedTradeRepository.save(parsedTrade);
-//            count = count + 1;
-
         }
+        catch (Exception e){
+            logger.error(e.getMessage());
+        }
+        logger.info("Parsing trades completed");
     }
 
     public void updateMaxRun2() {
         LocalDate today = LocalDate.now();
-//        LocalDate yesterday = today.minusDays(1);
+//        LocalDate yesterday = today.minusDays(0);
         List<ParsedTrade> parsedTrades = parsedTradeRepository.getTradesByDate(today);
 
         int tradeCount = 1;

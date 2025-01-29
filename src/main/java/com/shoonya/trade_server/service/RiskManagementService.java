@@ -2,6 +2,7 @@ package com.shoonya.trade_server.service;
 
 import com.shoonya.trade_server.config.IntradayConfig;
 import com.shoonya.trade_server.entity.DailyRecord;
+import com.shoonya.trade_server.entity.SessionVars;
 import com.shoonya.trade_server.exceptions.RecordNotFoundException;
 import com.shoonya.trade_server.lib.ShoonyaHelper;
 import com.shoonya.trade_server.repositories.DailyRecordRepository;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -28,11 +30,11 @@ public class RiskManagementService {
     IntradayConfig intradayConfig;
     DailyRecordRepository dailyRecordRepository;
     TradeParserService tradeParserService;
-
     private Logger logger = LoggerFactory.getLogger(RiskManagementService.class.getName());
 
     public RiskManagementService(ShoonyaHelper shoonyaHelper, IntradayConfig intradayConfig,
-                                 DailyRecordRepository dailyRecordRepository, TradeParserService tradeParserService){
+                                 DailyRecordRepository dailyRecordRepository, TradeParserService tradeParserService,
+                                 SessionVars sessionVars) {
         this.shoonyaHelper = shoonyaHelper;
         this.intradayConfig = intradayConfig;
         this.dailyRecordRepository = dailyRecordRepository;
@@ -42,21 +44,32 @@ public class RiskManagementService {
         this.maxTradeCount = this.intradayConfig.getMaxTrades();
         this.brokerage = 0;
         this.tradeParserService = tradeParserService;
-        this.maxLoss = getMaxloss();
-
+        this.maxLoss = sessionVars.getMaxLoss();
     }
 
-    public int getMaxloss(){
+
+    public int getMaxLoss(){
         LocalDate date = LocalDate.now();
         int maxLoss = 0;
         try {
             DailyRecord record = this.dailyRecordRepository.findById(date).orElseThrow(() -> new RecordNotFoundException("Record not found"));
             maxLoss = record.getMaxLoss();
+            maxLoss = Math.max(maxLoss, 10 * getBuyQty() );
         }  catch(Exception e) {
             logger.info("record not found for {}", date);
         }
         logger.info("max loss for today is {}", maxLoss);
-         return maxLoss;
+        return maxLoss;
+    }
+
+    public int getBuyQty() {
+        List<IntradayConfig.Index> indexes = intradayConfig.getIndexes();
+        int qty = 0;
+        for(IntradayConfig.Index index: indexes){
+            if(index.getName().equals("NIFTY"))
+                qty =  index.getBuyQty();
+        }
+        return qty;
     }
 
     @Scheduled(fixedRate = 60000)
@@ -87,38 +100,37 @@ public class RiskManagementService {
             return true;
         }
 
-        if(this.pnl <= this.maxLoss * -3/2 ){
+        if(this.pnl <= this.maxLoss * -2/3 ){  // <= -1000
             logger.info("next trade loss would exceed max_loss limit, stopping today's session");
             return true;
         }
         return false;
     }
 
-
     public void checkRiskManagement() throws InterruptedException {
         update();
         if(killswitch()) {
-            while (true) {
-                shoonyaHelper.exitAllMarketOrders();
-                shoonyaHelper.withdraw();
-                tradeParserService.checkAndPerformTask(true);
-                TimeUnit.SECONDS.sleep(30);
-            }
+//            while (true) {
+            logger.info("entering killswithc loop");
+            shoonyaHelper.exitAllMarketOrders();
+            shoonyaHelper.withdraw();
+            tradeParserService.checkAndPerformTask(true);
+            TimeUnit.SECONDS.sleep(30);
+//        }
         }
     }
 
     @PostConstruct
-    public void check(){
-        logger.warn("checking Killswitch on startup" );
+    public void checkRiskManagementOnStartup() throws InterruptedException {
         update();
-        if(killswitch()){
-            logger.warn("Killswitch condition crossed");
+        if(killswitch()) {
             shoonyaHelper.exitAllMarketOrders();
             shoonyaHelper.withdraw();
             tradeParserService.checkAndPerformTask(true);
-
+            TimeUnit.SECONDS.sleep(30);
         }
     }
+
 
     public int addFunds(Double money){
         return shoonyaHelper.requestFunds(money);

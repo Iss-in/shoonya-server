@@ -23,7 +23,8 @@ services:
 
     restart: no
     networks:
-      - docker_network
+      docker_network:
+        ipv4_address: 172.25.0.5
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
       interval: 30s

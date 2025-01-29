@@ -15,9 +15,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cglib.core.Local;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.SQLOutput;
 import java.text.ParseException;
@@ -85,10 +87,21 @@ public class TestController {
     }
 
 
+    // Base url http://localhost:8080/
+
+    // Get mapping to get status whether file exists or not (/getStatus/{filePath})
+    // response 200 status if it does otherwise 404
+
+    // Post mapping to upload file (/upload/{filePath}/{uploadEndpoint})
+    // reponse 200 status if done, otherwise some custom error code
+
+    // Post mapping to compress file (/compress/{filePath})
+    // reponse 200 status with filepath in body if done, otherwise some custom error code
 
     @GetMapping("/fetchHistoricalData/{tsym}")
     public List<Map<String, Object>> test(@PathVariable String tsym) {
         // Get the token for the given symbol
+        logger.info("fetching historical data for symbol {}", tsym);
         String token = misc.getToken("NFO", tsym);
 
         // Calculate the start time, one week before the current date

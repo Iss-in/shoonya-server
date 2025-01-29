@@ -31,32 +31,8 @@ public class OrderController {
 
     @PostMapping("/buyOrder/{symbol}/{priceType}/{price}")
     public ResponseEntity<String> buyOrder(@PathVariable String symbol,@PathVariable String priceType,  @PathVariable double price) {
-        logger.info("buy symbol {} at price {}", symbol, price);
-        LocalDateTime currentTime = LocalDateTime.now();
-        LocalDateTime lastTradeTime = tradeManagementService.getLastbuyTime();
-        long minutesPassed = Duration.between(lastTradeTime, currentTime ).toMinutes();
-        long timeRemaining = 15 - minutesPassed;
-
-        if (timeRemaining > 0)
-            return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(timeRemaining + "");
-        // place market order if price is 0
-        double triggerPrice = 0.0;
-        if(priceType.equals("SL-LMT"))
-            triggerPrice = price - 0.2;
-
-        JSONObject res = shoonyaHelper.placeOrder("B", "M", "NFO", symbol, 75, priceType
-                , price, triggerPrice);
-        logger.info("status:", res.toString());
-//        TODO: pass on correct response to response entity
-
-//        if(priceType.equals("MKT"))
-//        shoonyaHelper.placeOrder("B", "M", "NFO", symbol, 150, "MKT"
-//                    , 0.0, 0.0);
-//        else if(priceType.equals("LMT"))
-//            shoonyaHelper.placeOrder("B", "M", "NFO", symbol, 150, "LMT"
-//                    , price, 0.0);
+        JSONObject res = orderManagementService.buyOrder(symbol, priceType, price);
         return ResponseEntity.ok("order placed");
-
     }
 
 //    @GetMapping("/openOrders")

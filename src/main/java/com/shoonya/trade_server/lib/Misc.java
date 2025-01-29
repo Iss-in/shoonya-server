@@ -27,14 +27,12 @@ public class Misc {
     private final Map<String, Table > dataFrames;
     private final  List<IntradayConfig.Index> indexes;
 
-        private final LocalDate niftyExpiry;
     private static final Logger logger = LogManager.getLogger(Misc.class.getName());
 
 
     public Misc(StartupService startupService, IntradayConfig intradayConfig){
         this.dataFrames = startupService.getDataFrames();
         this.indexes = intradayConfig.getIndexes();
-        this.niftyExpiry = getNiftyExpiry(0);
     }
 
     public LocalDate getNiftyExpiry(int week){
