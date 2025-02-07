@@ -111,7 +111,7 @@ public class TradeParserService {
                 taskPerformed = true;
                 if (currentTime.isAfter(THRESHOLD_TIME)) {
                     logger.info("trade session over, exiting app");
-                    System.exit(0);
+//                    System.exit(0);
                 }
             }
         }

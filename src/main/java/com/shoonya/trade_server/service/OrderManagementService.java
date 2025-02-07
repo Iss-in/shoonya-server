@@ -44,9 +44,10 @@ public class OrderManagementService {
                     shoonyaHelper.modifyOrder(order.getString("exch"), order.getString("tsym"), norenordno,
                             order.getInt("qty"), "LMT", newPrice, 0.0);
 
+                int type = order.getString("trantype").equals("B") ? -1 : 1;
                 if (order.getString("prctyp").equals("SL-LMT"))
                     shoonyaHelper.modifyOrder(order.getString("exch"), order.getString("tsym"), norenordno,
-                            order.getInt("qty"), "SL-LMT", newPrice, newPrice - 0.2);
+                            order.getInt("qty"), "SL-LMT", newPrice, newPrice + 0.2 * type);
 
                 break;
             }

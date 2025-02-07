@@ -61,7 +61,7 @@ class Countdown{
 
         return formattedTime;
     }
-    private void startTimer() {
+    public void startTimer() {
         stopTimer();
 
         Thread timerThread = new Thread(() -> {
@@ -179,6 +179,8 @@ public class TradeManagementService {
         this.buyQty = sessionVars.getBuyQty();
         this.maxLoss = sessionVars.getMaxLoss();
         this.dailyRecordRepository = dailyRecordRepository;
+
+        this.timer = new Countdown(0, webSocketService);
     }
 
 
@@ -443,7 +445,10 @@ public class TradeManagementService {
                 createTrade(token, orderUpdate);
 //                candleStics.put(token, shoonyaHelper.getTimePriceSeries())
                 subscribe(new TokenInfo(exch, token,null));
-                timer = new Countdown(15 * 60, webSocketService);
+
+                timer.setSeconds(15 * 60);
+                timer.startTimer();
+//                timer = new Countdown(15 * 60, webSocketService);
             }
         }
     }
