@@ -50,7 +50,13 @@ public class OrderController {
     @PostMapping("/modifyOrder/{norenordno}/{newPrice}")
     public ResponseEntity<String > modifyOrder(@PathVariable String norenordno, @PathVariable Double newPrice){
         orderManagementService.modifyOrder(norenordno, newPrice);
-        return ResponseEntity.ok("order modofied");
+        return ResponseEntity.ok("order modified");
+    }
+
+    @PostMapping("/updateTargets")
+    public ResponseEntity<?> updateTargets(@RequestBody Map<String, Double> targets){
+        tradeManagementService.updateTargets(targets);
+        return ResponseEntity.ok("request recieved");
     }
 
 }

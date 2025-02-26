@@ -111,11 +111,11 @@ public class RiskManagementService {
         update();
         if(killswitch()) {
 //            while (true) {
-            logger.info("entering killswithc loop");
+            logger.info("entering killswitch loop");
             shoonyaHelper.exitAllMarketOrders();
             shoonyaHelper.withdraw();
             tradeParserService.checkAndPerformTask(true);
-            TimeUnit.SECONDS.sleep(30);
+//            TimeUnit.SECONDS.sleep(30);
 //        }
         }
     }
@@ -124,10 +124,11 @@ public class RiskManagementService {
     public void checkRiskManagementOnStartup() throws InterruptedException {
         update();
         if(killswitch()) {
+            logger.info("entering killswitch loop");
             shoonyaHelper.exitAllMarketOrders();
             shoonyaHelper.withdraw();
             tradeParserService.checkAndPerformTask(true);
-            TimeUnit.SECONDS.sleep(30);
+//            TimeUnit.SECONDS.sleep(30);
         }
     }
 

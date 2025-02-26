@@ -216,7 +216,7 @@ public class ShoonyaHelper {
                     logger.warn("trying to place order again");
                 }
                 else
-                    webSocketService.sendToast("Order purchased Successfully","");
+                    webSocketService.sendToast("Order placed","");
 
                 if (currentTries >= MAX_TRIES) {
                     logger.error("Max attempts to place order failed");
@@ -386,6 +386,17 @@ public class ShoonyaHelper {
         String withdraw =  "" + funds;
         int returnCode = api.collect_trans_req(withdraw);
         return returnCode;
+    }
+
+    public double getMargin(){
+        JSONObject ret = this.api.get_limits();
+        if(ret == null)
+            return 0;
+
+        double margin = 0;
+        if(ret.has("cash"))
+            margin = ret.getDouble("cash");
+        return margin;
     }
 
 }

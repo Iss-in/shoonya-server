@@ -190,6 +190,44 @@ public class TradeManagementService {
         webSocketService .updateOrderFeed(openOrders);
     }
 
+    public void updateTargets(Map<String, Double> targets){
+        Map<String, Object> res = new HashMap<>();
+        if(!tradeManager.isTradeActive()) {
+            logger.info("trade is not active");
+            webSocketService.sendToast("Targets Update request", "Trade is not active");
+//            return;
+        }
+
+        logger.info("targets are {}, {}, {}" , targets.get("t1"), targets.get("t2"), targets.get("t3"));
+        JSONObject ret;
+
+        Map<String, Map<String, PartialTrade>> trades = tradeManager.getTrades();
+        for (Map<String, PartialTrade> partialTrades : trades.values()) {
+            for (Map.Entry<String, PartialTrade> entry : partialTrades.entrySet()){
+                PartialTrade trade = entry.getValue();
+                Double entryPrice = trade.getEntryPrice();
+                Double initialTargetPrice = trade.getTargetPrice();
+
+                // update target based on name
+                if(trade.getName().equals("t1"))
+                    trade.setTargetPrice(targets.get("t1") + entryPrice);
+                if(trade.getName().equals("t2"))
+                    trade.setTargetPrice(targets.get("t2") + entryPrice);
+                if(trade.getName().equals("t3"))
+                    trade.setTargetPrice(targets.get("t3") + entryPrice);
+
+                // change limit order price if already in place
+                if(trade.getOrderType().equals("LMT")){
+                    ret = shoonyaHelper.modifyOrder(trade.getExch(), trade.getTsym(), trade.getOrderNumber(), trade.getQty()
+                            , "LMT", trade.getTargetPrice(), null);
+                    logger.info("LMT order of trade {} got modified from {}  to {}",trade.getName(), initialTargetPrice,  trade.getTargetPrice());
+                    logger.info(ret);
+                    }
+            }
+        }
+        webSocketService.sendToast("Targets Update request", "Targets Updated");
+    }
+
     public void eventHandlerOrderUpdate(JSONObject orderUpdate){
         logger.info("order feed {}", orderUpdate);
 

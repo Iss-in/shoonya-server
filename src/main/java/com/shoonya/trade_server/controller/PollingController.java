@@ -105,5 +105,13 @@ public class PollingController {
         optionUpdateService.setLastestOptions(true);
     }
 
+    @GetMapping("/margin")
+    public Map<String, Double> getMargin(){
+        Double margin = shoonyaHelper.getMargin();
+        Map<String, Double> res = new HashMap<>();
+        res.put("margin", margin);
+        return res;
+    }
+
 
 }

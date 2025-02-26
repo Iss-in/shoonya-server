@@ -42,7 +42,7 @@ public class Misc {
         LocalDate expiry = niftyExpiries.get(week);
         if(today.isEqual(expiry)) {
             logger.info("expiry day, change from {} to {}", expiry, niftyExpiries.get(1));
-            expiry = niftyExpiries.get(week+1);
+            expiry = niftyExpiries.get(week+0);
         }
         logger.info("nifty expiry is {}", expiry);
         return expiry;

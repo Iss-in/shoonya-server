@@ -48,6 +48,8 @@ public class TestController {
 
     @Autowired
     Misc misc;
+    @Autowired
+    private TradeManagementService tradeManagementService;
 
     public TestController(ShoonyaHelper shoonyaHelper, RiskManagementService riskManagementService,
                           TradeRepository tradeRepository, TradeParserService tradeParserService,
@@ -83,6 +85,7 @@ public class TestController {
     public ResponseEntity<String> endSession() {
         riskManagementService.withdrawFunds();
         webSocketService.sendToast("Session closed","Fuck off and do work now");
+        tradeParserService.checkAndPerformTask(true);
         return ResponseEntity.ok("Session ended");
     }
 
@@ -109,7 +112,7 @@ public class TestController {
                 .atStartOfDay(ZoneId.systemDefault()).toInstant().getEpochSecond();
 
         // Get the time price series data
-        JSONArray res = shoonyaHelper.getTimePriceSeries("NFO", token, String.valueOf(starttime), null, "1");
+        JSONArray res = shoonyaHelper.getTimePriceSeries("NFO", token, String.valueOf(starttime), null, "3");
 
         // Convert JSONArray to List of Maps (each map representing a candlestick)
         List<Map<String, Object>> list = new ArrayList<>();

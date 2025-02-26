@@ -164,29 +164,34 @@ public class OptionUpdateService {
         double currentCallDelta = getDelta(indexPrice, this.atmCe);
         double currentPutDelta = 1 - getDelta(indexPrice, this.atmPe);
 
+        // fetch the closest call delta which is greater than 0.65
         double newCallDelta = 0;int callDeltaIndex = 0;
         for(callDeltaIndex = callDeltas.size() -1 ;callDeltaIndex >= 0; callDeltaIndex--){
             double targetCallDelta = callDeltas.get(callDeltaIndex);
-            if(targetCallDelta >= 0.5){
+            if(targetCallDelta >= 0.65){
                 newCallDelta = targetCallDelta;
                 break;
             }
         }
+
+        // fetch the closest put delta which is greater than 0.65
+
         double newPutDelta = 0; int putDeltaIndex = 0;
         for(putDeltaIndex = 0;putDeltaIndex < putDeltas.size();putDeltaIndex++){
             double targetPutDelta = putDeltas.get(putDeltaIndex);
-            if(targetPutDelta >= 0.5){
+            if(targetPutDelta >= 0.65){
                 newPutDelta = targetPutDelta;
                 break;
             }
         }
 
-        if(Math.abs(newCallDelta - currentCallDelta) > 0.05 ||  currentCallDelta < 0.5) {
+        // pick new delta if difference of current from new delta is more than 0.1 or current delta is less than 0.65
+        if(Math.abs(newCallDelta - currentCallDelta) > 0.1 ||  currentCallDelta < 0.65) {
             this.atmCe = strikes.get(callDeltaIndex);
             flag = true;
         }
 
-        if(Math.abs(newPutDelta - currentPutDelta) > 0.05 ||  currentPutDelta < 0.5) {
+        if(Math.abs(newPutDelta - currentPutDelta) > 0.1 ||  currentPutDelta < 0.65) {
             this.atmPe = strikes.get(putDeltaIndex);
             flag = true;
         }

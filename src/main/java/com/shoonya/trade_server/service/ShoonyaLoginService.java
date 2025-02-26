@@ -36,7 +36,7 @@ public class ShoonyaLoginService {
     public ShoonyaLoginService(ShoonyaConfig config){
 
         String classpath = System.getProperty("java.class.path");
-        logger.error(classpath);
+//        logger.error(classpath);
         this.config = config;
         logger.info("initiating api login");
         this.api = loginToApi();

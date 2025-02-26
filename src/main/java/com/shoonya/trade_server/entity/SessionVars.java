@@ -42,7 +42,7 @@ public class SessionVars {
         }  catch(Exception e) {
             logger.info("record not found for {}", date);
         }
-        maxLoss = Math.max(maxLoss, 10 * buyQty);
+        maxLoss = Math.max(maxLoss, 20 * buyQty);
         logger.info("max loss for today is {}", maxLoss);
         return maxLoss;
     }

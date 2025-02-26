@@ -99,7 +99,7 @@ public class TradeParserService {
     }
 
 
-    void checkAndPerformTask(boolean manual) {
+    public void checkAndPerformTask(boolean manual) {
         if (!taskPerformed && validDay) {
             // Get the current time
             LocalTime currentTime = LocalTime.now();
